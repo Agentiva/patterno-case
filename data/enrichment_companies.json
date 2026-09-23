@@ -1,0 +1,123 @@
+[
+ {
+  "domain": "bechtle.com",
+  "name": "Bechtle",
+  "employees": 17000,
+  "industry": "information technology & services",
+  "phone": "+49 713 29810",
+  "linkedin": "http://www.linkedin.com/company/bechtle",
+  "founded": 1983,
+  "city": "Neckarsulm",
+  "country": "Germany"
+ },
+ {
+  "domain": "computacenter.com",
+  "name": "Computacenter",
+  "employees": 21000,
+  "industry": "information technology & services",
+  "phone": "+44 17 0763 1000",
+  "linkedin": "http://www.linkedin.com/company/computacenter",
+  "founded": 1981,
+  "city": "Hatfield",
+  "country": "United Kingdom"
+ },
+ {
+  "domain": "sva.de",
+  "name": "SVA System Vertrieb Alexander GmbH",
+  "employees": 3200,
+  "industry": "information technology & services",
+  "phone": "+49 6122 5360",
+  "linkedin": "http://www.linkedin.com/company/sva-system-vertrieb-alexander-gmbh",
+  "founded": 1997,
+  "city": "Wiesbaden",
+  "country": "Germany"
+ },
+ {
+  "domain": "cancom.de",
+  "name": "CANCOM",
+  "employees": 5300,
+  "industry": "information technology & services",
+  "phone": "+49 822 59961000",
+  "linkedin": "http://www.linkedin.com/company/cancom",
+  "founded": 1992,
+  "city": "Munich",
+  "country": "Germany"
+ },
+ {
+  "domain": "adesso.de",
+  "name": "adesso SE",
+  "employees": 12000,
+  "industry": "information technology & services",
+  "phone": "+49 622 73581660",
+  "linkedin": "http://www.linkedin.com/company/adesso-se",
+  "founded": 1997,
+  "city": "Dortmund",
+  "country": "Germany"
+ },
+ {
+  "domain": "materna.de",
+  "name": "Materna",
+  "employees": 4500,
+  "industry": "information technology & services",
+  "phone": "+49 231 559900",
+  "linkedin": "http://www.linkedin.com/company/materna-information-communications-se",
+  "founded": 1980,
+  "city": "Dortmund",
+  "country": "Germany"
+ },
+ {
+  "domain": "mr-daten.de",
+  "name": "MR Datentechnik Vertriebs- und Service GmbH",
+  "employees": 550,
+  "industry": "information technology & services",
+  "phone": "+49 911 521470",
+  "linkedin": "http://www.linkedin.com/company/mr-datentechnik",
+  "founded": 1994,
+  "city": "Nuremberg",
+  "country": "Germany"
+ },
+ {
+  "domain": "controlware.de",
+  "name": "Controlware",
+  "employees": 900,
+  "industry": "information technology & services",
+  "phone": "+49 6074 85800",
+  "linkedin": "http://www.linkedin.com/company/controlware-de",
+  "founded": 1980,
+  "city": "Dietzenbach",
+  "country": "Germany"
+ },
+ {
+  "domain": "iteratec.com",
+  "name": "iteratec",
+  "employees": 500,
+  "industry": "information technology & services",
+  "phone": "+49 89 6145510",
+  "linkedin": "http://www.linkedin.com/company/iteratec-gmbh",
+  "founded": 1996,
+  "city": "Munich",
+  "country": "Germany"
+ },
+ {
+  "domain": "arktis-gmbh.de",
+  "name": "ARKTIS IT solutions GmbH",
+  "employees": 63,
+  "industry": "information technology & services",
+  "phone": "+49 30 4997820",
+  "linkedin": "http://www.linkedin.com/company/arktis-gmbh",
+  "founded": 1988,
+  "city": "Berlin",
+  "country": "Germany"
+ },
+ {
+  "domain": "wbs-it.de",
+  "name": "WBS IT-Service GmbH",
+  "employees": 180,
+  "industry": "information technology & services",
+  "phone": "+49 341 982710",
+  "linkedin": "http://www.linkedin.com/company/wbs-it-service-gmbh",
+  "founded": 1990,
+  "city": "Leipzig",
+  "country": "Germany"
+ }
+]
