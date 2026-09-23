@@ -214,11 +214,18 @@ def cmd_export(args: argparse.Namespace) -> int:
               f"zurueck. Erst 'python3 -m src.cli longlist --live' laufen lassen.")
 
     out = []
+    trace = []
     for company_id, sigs in by_company.items():
         tier = tier_map.get(company_id, "C")
         score, comp = score_account(sigs, tier=tier)
         # Der Why-now-Satz MUSS aus dem Signal kommen, das den Score treibt.
         driver = comp.pop("driver_signal", None) or sigs[0]
+        # Die Score-Zerlegung ist fuer die Nachvollziehbarkeit wichtig, aber
+        # sie ist ein JSON-Blob je Zeile und machte 74 % der Datei aus. In
+        # einer Tabelle, die ein Mensch oeffnet, hat sie nichts verloren -
+        # also eigene Datei, verbunden ueber company_id.
+        trace.append({"company_id": company_id, "score": score,
+                      "score_components": json.dumps(comp, ensure_ascii=False)})
         out.append({
             "company_id": company_id,
             "firma_raw": driver["org_name_raw"],
@@ -235,7 +242,6 @@ def cmd_export(args: argparse.Namespace) -> int:
             "in_longlist_1": "ja" if company_id in tier_map else "nein",
             "enrich": "ja" if score >= ENRICH_SCORE_THRESHOLD else "nein",
             "why_now": build_why_now(driver),
-            "score_components": json.dumps(comp, ensure_ascii=False),
         })
 
     out.sort(key=lambda r: r["score"], reverse=True)
@@ -247,6 +253,15 @@ def cmd_export(args: argparse.Namespace) -> int:
             w.writerows(out)
     print(f"{path}: {len(out)} Accounts "
           f"({sum(1 for r in out if r['enrich'] == 'ja')} ueber Enrichment-Schwelle)")
+
+    if trace:
+        tpath = DATA / "score_trace.csv"
+        trace.sort(key=lambda r: r["score"], reverse=True)
+        with tpath.open("w", encoding="utf-8-sig", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(trace[0]), quoting=csv.QUOTE_ALL)
+            w.writeheader()
+            w.writerows(trace)
+        print(f"{tpath}: Score-Zerlegung je Account (Join ueber company_id)")
 
     # Vergabestellen-Feed separat: Input fuer den Join gegen Longlist 1,
     # nicht fuer Outbound.

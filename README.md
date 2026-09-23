@@ -114,6 +114,12 @@ Lauf 2 (direkt danach)  neu     0   geändert   6   unverändert 395
 Die 6 Änderungen in Lauf 2 sind echte Korrekturen im Überlappungsfenster,
 keine Artefakte — genau dafür ist das Fenster da.
 
+**Nachvollziehbarkeit:** Jeder Score ist aufklappbar — die vollständige
+Zerlegung (Gewicht × Recency × ICP-Fit × Confidence, Stacking, Treiber-Signal)
+steht in `data/score_trace.csv`, verbunden über `company_id`. Bewusst als
+eigene Datei: als Spalte war sie 74 % der Dateigröße und machte die Tabelle
+für Menschen unlesbar.
+
 **Ergebnis:** 669 Accounts mit Signal, **197 über der Score-Schwelle (29 %)**.
 Die Schwelle ist an der beobachteten Verteilung kalibriert, nicht geraten;
 die Messreihe steht als Kommentar in `src/config.py`.
@@ -222,6 +228,7 @@ in die Review-Queue fällt und Menschenzeit kostet.
 |---|---|
 | `data/longlist_markt.csv` | Aufgabe 1 — 2.468 Unternehmen mit Beleg |
 | `data/longlist_signale.csv` | Aufgabe 2 — 669 Accounts mit Score und „Why now" |
+| `data/score_trace.csv` | Score-Zerlegung je Account, Join über `company_id` |
 | `data/offene_verfahren.csv` | Vergabestellen-Feed, Join-Input, **kein Outbound** |
 | `data/job_signale_ohne_icp_beleg.csv` | Prüfbestand, **kein Outbound** |
 | `docs/waterfalls.md` | Enrichment-Waterfalls mit gemessenen Quoten |

@@ -6,9 +6,12 @@ Bewusst multiplikativ und nicht additiv: Ein starkes Signal auf einem
 Account, dessen Firmenzuordnung wacklig ist, darf nicht nach oben rutschen.
 Die Confidence wirkt als Daempfer auf alles andere - Praezision vor Volumen.
 
-score_components wird als JSON mitexportiert. Jeder Score ist damit
-aufklappbar statt Blackbox. Das ist die Antwort auf "Quelle und Confidence
-fuer jedes Feld der Logik".
+score_components wird als JSON exportiert - seit dem 23.09.2026 in einer
+eigenen Datei (data/score_trace.csv, Join ueber company_id) statt als Spalte
+in der Signal-CSV. Grund: Der Blob machte 74 % der Dateigroesse aus und
+machte die Tabelle fuer Menschen unlesbar. Jeder Score bleibt aufklappbar
+statt Blackbox - das ist die Antwort auf "Quelle und Confidence fuer jedes
+Feld der Logik" -, nur eben eine Datei weiter.
 """
 from __future__ import annotations
 
