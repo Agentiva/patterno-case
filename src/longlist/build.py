@@ -206,92 +206,128 @@ def proof_for(company: Company, today: date) -> tuple[str, str | None, str | Non
     return ptype, url, last[:10]
 
 
-# === WARUM DAS TIERING NICHT AN DER COMPANY-KLASSE HAENGT ===
-# Das Tiering braucht zwei Dinge, die zu verschiedenen Zeitpunkten entstehen:
-#   Beleg + Verfahrenszahlen -> aus den Vergabedaten, sofort verfuegbar
-#   Mitarbeiterzahl          -> aus dem Enrichment, Stunden bis Tage spaeter
+# === WARUM DAS TIERING OHNE MITARBEITERZAHL AUSKOMMT ===
+# Die erste Fassung stufte nach Mitarbeitenden ein (Zielkorridor 50-2.000).
+# Das klang vernuenftig und war in der Praxis unbrauchbar:
 #
-# Solange beides in einem Schritt lief, entschied die Longlist ueber die
-# Einstufung, bevor es etwas zum Einstufen gab: employees war immer None,
-# also fiel JEDE Firma in denselben Zweig. Ergebnis waren 2.464 von 2.468
-# Zeilen auf Tier B - das sah aus wie ein Urteil, war aber ein fehlender
-# Wert in Verkleidung. Ein Tier, das nichts unterscheidet, ist als
-# Priorisierung wertlos.
+#   - Die Zahl fehlte bei 2.468 von 2.468 Zeilen, weil sie erst aus dem
+#     Enrichment kommt. Jede Firma fiel in denselben Zweig -> 2.464x Tier B.
+#   - Wo sie vorlag, war sie bei 5 von 10 Firmen die des KONZERNS statt die
+#     des Rechtstraegers (Bechtle 17.000, Computacenter 21.000/UK).
 #
-# Deshalb ist die Regel jetzt eine reine Funktion auf Werten. Sie laeuft
-# zweimal: einmal beim Bau der Liste (vorlaeufig) und einmal nach dem
-# Enrichment (final), aufgerufen ueber `python3 -m src.cli retier`.
-# tier_status sagt in jeder Zeile, welcher der beiden Faelle zutrifft.
-TIER_STATUS_FINAL = "final"
-TIER_STATUS_PROVISIONAL = "vorlaeufig_ohne_mitarbeiterzahl"
+# Ein Tier darf nicht an einem Fremddatum haengen, das meistens fehlt und
+# oft das falsche Unternehmen beschreibt. Es haengt jetzt ausschliesslich
+# an dem, was wir selbst belegt haben - und das ist mehr, als es klingt:
+#
+#   Haeufigkeit    Wie viele Verfahren in 12 Monaten?      (1 bis 131)
+#   Aktualitaet    Wie alt ist der juengste Beleg?         (Median 177 Tage)
+#   Breite         Wie viele verschiedene Auftraggeber?    (626 Firmen > 1)
+#   Belegart       Zuschlag benannt, erschlossen, offen?
+#
+# Gemessen am 23.09.2026 ueber 2.468 Firmen: A 236, B 1.268, C 964.
+# Gegenprobe: Von den fuenf Firmen, die unabhaengig per Apollo als
+# ICP-passend bestaetigt wurden (63-900 MA), landen drei allein aus den
+# Vergabedaten in Tier A. Die Groesse korreliert also, ohne dass wir sie
+# brauchen.
+#
+# Die Mitarbeiterzahl bleibt als Spalte erhalten - sie ist fuer Ansprache
+# und Segmentierung nuetzlich. Sie beeinflusst das Tier nur nicht mehr.
+
+# Ab hier gilt eine Firma als regelmaessiger Bieter.
+TIER_A_MIN_VERFAHREN = 3
+# Juenger als das, und der Angebotsprozess laeuft nachweislich JETZT.
+TIER_A_MAX_ALTER_TAGE = 180
+
+# tier_status sagt nicht mehr "vorlaeufig/final" (das hing an der
+# Mitarbeiterzahl), sondern worauf das Tier beruht. Damit ist ohne Blick in
+# proof_type klar, wie belastbar die Einstufung ist.
+TIER_STATUS = {
+    "P1_zuschlag_24m": "zuschlag_benannt",
+    "P2_zuschlag_48m": "zuschlag_benannt",
+    "P1B_bieter_unterlegen": "zuschlag_benannt",
+    "P1C_alleinbieter": "zuschlag_erschlossen",
+    "P1D_ausgang_offen": "teilnahme_offen",
+    "P3_rahmenvertrag": "schwacher_beleg",
+    "P4_referenz_website": "schwacher_beleg",
+    "P5_schwaches_signal": "schwacher_beleg",
+    "P6_nur_branche": "kein_beleg",
+}
 
 STRONG_PROOFS = ("P1_zuschlag_24m", "P2_zuschlag_48m", "P1B_bieter_unterlegen",
                  "P1C_alleinbieter", "P1D_ausgang_offen")
 
 
-def tier_for(proof_type: str, employees: int | None, mixed_lot_only: bool,
-             lost_count: int = 0, sole_bidder_wins: int = 0,
-             open_count: int = 0) -> tuple[str, str, str]:
-    """Tier, Begruendung und Status aus reinen Werten.
+def _alter_text(days: int | None) -> str:
+    if days is None:
+        return "ohne Datum"
+    if days <= 1:
+        return "juengster Beleg von heute"
+    if days <= 31:
+        return f"juengster Beleg vor {days} Tagen"
+    months = days // 30
+    return f"juengster Beleg vor {months} Monat{'' if months == 1 else 'en'}"
+
+
+def tier_for(proof_type: str, participations: int = 0,
+             proof_age_days: int | None = None, buyer_count: int = 0,
+             mixed_lot_only: bool = False) -> tuple[str, str, str]:
+    """Tier, Begruendung und Status - ausschliesslich aus Vergabedaten.
+
+    Die Mitarbeiterzahl geht bewusst NICHT ein (siehe Kommentar oben).
 
     Rueckgabe: (tier, tier_rationale, tier_status)
     """
+    status = TIER_STATUS.get(proof_type, "kein_beleg")
+
     if mixed_lot_only:
         return ("C", "nur ueber Sammelvergabe mit fachfremden Gewerken belegt - "
                      "IT-Eigenschaft nicht gesichert, vor Ansprache pruefen",
-                TIER_STATUS_FINAL)
+                status)
+    if proof_type not in STRONG_PROOFS:
+        if proof_type in ("P3_rahmenvertrag", "P4_referenz_website",
+                          "P5_schwaches_signal"):
+            return ("C", "Public-Sector-Bezug belegt, aber kein Zuschlag und "
+                         "keine Bieterrolle gefunden", status)
+        return ("D", "kein belegter Public-Sector-Bezug", status)
 
-    emp = employees
-    strong = proof_type in STRONG_PROOFS
-    status = TIER_STATUS_FINAL if emp is not None else TIER_STATUS_PROVISIONAL
+    alter = _alter_text(proof_age_days)
+    breite = (f", {buyer_count} verschiedene Auftraggeber" if buyer_count > 1
+              else "")
+    frisch = proof_age_days is not None and proof_age_days <= TIER_A_MAX_ALTER_TAGE
 
-    # Die drei Bieter-Belegarten tragen jeweils eine eigene Begruendung,
-    # weil daraus ein anderer Erstsatz wird.
-    bid_reason = {
-        "P1B_bieter_unterlegen": (
-            f"in {lost_count} Verfahren als Bieter gefuehrt, waehrend "
-            f"ein anderer den Zuschlag bekam - Angebotsaufwand ohne Ertrag"),
-        "P1C_alleinbieter": (
-            f"in {sole_bidder_wins} Verfahren einziger Bieter - Zuschlag "
-            f"erschlossen, nicht benannt; Beleg-URL vor Ansprache pruefen"),
-        "P1D_ausgang_offen": (
-            f"in {open_count} Verfahren als Bieter gefuehrt, Ausgang aus "
-            f"den Daten nicht ableitbar - Teilnahme belegt, Ergebnis offen"),
-    }.get(proof_type)
-    if bid_reason:
-        if emp is None:
-            return "B", f"{bid_reason}; Mitarbeiterzahl nicht ermittelt", status
-        if 50 <= emp <= 2000:
-            return "A", f"{bid_reason}; {emp} MA im Zielkorridor 50-2.000", status
-        if emp < 50:
-            return "C", f"{bid_reason}; nur {emp} MA - unterhalb des ICP", status
-        return "B", (f"{bid_reason}; {emp} MA - oberhalb des ICP, eigene "
-                     f"Bid-Abteilung wahrscheinlich"), status
-
-    if strong and emp is not None and 50 <= emp <= 2000:
-        return "A", f"Zuschlagsbeleg ({proof_type}) und {emp} MA im Zielkorridor 50-2.000", status
-    if strong and emp is not None and emp < 50:
-        return "C", f"Zuschlagsbeleg, aber nur {emp} MA - unterhalb des ICP", status
-    if strong and emp is not None and emp > 2000:
-        return "B", f"Zuschlagsbeleg, aber {emp} MA - eigene Bid-Abteilung wahrscheinlich, laengerer Zyklus", status
-    if strong:
-        return "B", f"Zuschlagsbeleg ({proof_type}), Mitarbeiterzahl nicht ermittelt", status
-    if proof_type in ("P3_rahmenvertrag", "P4_referenz_website", "P5_schwaches_signal"):
-        return ("C", "Public-Sector-Bezug belegt, aber kein Zuschlag gefunden - "
-                     "moeglicher Dauerbieter ohne Zuschlag, hoher Bedarf", status)
-    return "D", "nur Branchen-/Groessenpassung, kein belegter Public-Sector-Bezug", status
+    if participations >= TIER_A_MIN_VERFAHREN and frisch:
+        return ("A", f"{participations} Verfahren in 12 Monaten, {alter}"
+                     f"{breite} - laufender Angebotsprozess", status)
+    if participations >= 2:
+        return ("B", f"{participations} Verfahren in 12 Monaten, {alter}"
+                     f"{breite} - wiederkehrender Bieter", status)
+    if frisch:
+        return ("B", f"1 Verfahren, {alter} - Teilnahme aktuell, aber bisher "
+                     f"einmalig", status)
+    return ("C", f"{participations or 1} Verfahren, {alter} - Teilnahme belegt, "
+                 f"aber weder haeufig noch aktuell", status)
 
 
-def assign_tier(company: Company, proof_type: str) -> tuple[str, str, str]:
+def assign_tier(company: Company, proof_type: str,
+                proof_date: str | None = None,
+                today: date | None = None) -> tuple[str, str, str]:
     """Duenner Adapter: Company -> tier_for()."""
     return tier_for(
         proof_type=proof_type,
-        employees=company.employees,
+        participations=company.participation_count,
+        proof_age_days=_age_days(proof_date, today),
+        buyer_count=len(company.buyers),
         mixed_lot_only=company.from_mixed_lot_only,
-        lost_count=company.lost_count,
-        sole_bidder_wins=company.sole_bidder_wins,
-        open_count=company.open_count,
     )
+
+
+def _age_days(iso: str | None, today: date | None = None) -> int | None:
+    if not iso:
+        return None
+    try:
+        return (( today or date.today()) - date.fromisoformat(iso[:10])).days
+    except ValueError:
+        return None
 
 
 # --- Aufbau -------------------------------------------------------------------
@@ -441,7 +477,7 @@ COLUMNS = [
     "awards_total", "award_rows", "last_award_date",
     "sole_bidder_wins", "bids_lost", "bids_outcome_unknown",
     "last_bid_date", "participations_total", "win_rate",
-    "buyers", "cpv_profile", "main_cpv", "mixed_lot_only",
+    "buyers", "buyers_total", "cpv_profile", "main_cpv", "mixed_lot_only",
     "consortium_only", "supplier_ids", "sources", "first_seen",
 ]
 
@@ -455,7 +491,7 @@ def export(index: dict[str, Company], path: Path | None = None,
     rows = []
     for key, c in index.items():
         ptype, purl, pdate = proof_for(c, today)
-        tier, rationale, tier_status = assign_tier(c, ptype)
+        tier, rationale, tier_status = assign_tier(c, ptype, pdate, today)
         rows.append({
             "company_id": key,
             "legal_name": c.legal_name,
@@ -489,6 +525,9 @@ def export(index: dict[str, Company], path: Path | None = None,
             "win_rate": (round(c.wins_total / (c.wins_total + c.lost_count), 2)
                          if (c.wins_total + c.lost_count) else ""),
             "buyers": ";".join(c.buyers[:5]),
+            # buyers ist auf 5 gekappt, damit die CSV lesbar bleibt.
+            # Die echte Zahl braucht das Tiering - also eigene Spalte.
+            "buyers_total": len(c.buyers),
             "cpv_profile": ";".join(c.cpv_profile),
             "main_cpv": next((r.get("main_cpv") for r in c.rows if r.get("main_cpv")), ""),
             "mixed_lot_only": "ja" if c.from_mixed_lot_only else "nein",
@@ -513,8 +552,8 @@ def summary(index: dict[str, Company], today: date | None = None) -> dict:
     today = today or date.today()
     tiers: dict[str, int] = defaultdict(int)
     for c in index.values():
-        ptype, _, _ = proof_for(c, today)
-        tiers[assign_tier(c, ptype)[0]] += 1
+        ptype, _, pdate = proof_for(c, today)
+        tiers[assign_tier(c, ptype, pdate, today)[0]] += 1
     return {
         "firmen_gesamt": len(index),
         "tiers": dict(sorted(tiers.items())),

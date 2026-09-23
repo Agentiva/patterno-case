@@ -1,21 +1,22 @@
-"""Angereicherte Domains und Mitarbeiterzahlen zurueck in die Longlist - und
-danach NEU EINSTUFEN.
+"""Angereicherte Domains und Mitarbeiterzahlen zurueck in die Longlist.
 
-=== WARUM DIESER SCHRITT EIGENSTAENDIG IST ===
-Das Tiering braucht zwei Dinge, die zu verschiedenen Zeitpunkten entstehen:
+=== WAS DIESES MODUL TUT UND WAS NICHT ===
+Es fuellt Domain, Mitarbeiterzahl, Branche und LinkedIn - alles, was die
+ANSPRACHE braucht.
 
-    Beleg + Verfahrenszahlen   aus den Vergabedaten       sofort
-    Mitarbeiterzahl + Domain   aus Clay / Apollo          spaeter
+Es entscheidet NICHT ueber das Tier. Das haengt ausschliesslich an
+Vergabedaten (siehe src/longlist/build.py, tier_for). Der Grund steht dort
+ausfuehrlich; kurz: Die Mitarbeiterzahl fehlte bei allen 2.468 Zeilen und
+war dort, wo sie vorlag, bei 5 von 10 Firmen die des Konzerns statt die des
+bietenden Rechtstraegers.
 
-Solange beides in einem Schritt lief, entschied die Longlist ueber die
-Einstufung, bevor es etwas zum Einstufen gab. `employees` war immer None,
-also fiel jede Firma in denselben Zweig: 2.464 von 2.468 Zeilen auf Tier B.
-Das sah aus wie ein Urteil, war aber ein fehlender Wert in Verkleidung.
-
-Dieses Modul schliesst den Kreis:
-    longlist --live   ->  vorlaeufige Tiers, tier_status = vorlaeufig
+    longlist --live   ->  Tiers stehen fest (Vergabedaten)
     (Clay / Apollo)   ->  Domain + Mitarbeiterzahl
-    retier            ->  endgueltige Tiers, tier_status = final
+    retier            ->  Anreicherung einspielen
+
+Das Tier wird hier trotzdem neu gerechnet, aber aus einem anderen Grund:
+Ein Kriterium wandert mit der Zeit - die Aktualitaet des Belegs wird jeden
+Tag schlechter. Deshalb laeuft `retier` auch ohne --from sinnvoll.
 
 === DIE FALLE, DIE HIER ABGEFANGEN WIRD ===
 Apollo loest eine Domain auf den KONZERN auf, die Vergabe ging aber an den
@@ -29,13 +30,13 @@ RECHTSTRAEGER. Zwei Beispiele aus dem Lauf vom 23.09.2026:
   Apollo:      bechtle.com -> Neckarsulm, 17.000 MA
                = die Bechtle AG, also der Konzern
 
-Fuer das Tiering ist das falsch: Der ICP zielt auf 50-2.000 Mitarbeitende,
-und der bietende Rechtstraeger hat oft einen Bruchteil der Konzerngroesse.
-Wer den Konzernwert uebernimmt, stuft systematisch falsch ein und schreibt
-den Konzernvertrieb an statt die Niederlassung, die tatsaechlich bietet.
+Das Tier beruehrt das nicht mehr. Fuer die ANSPRACHE ist es trotzdem
+entscheidend: Wer 17.000 als Groesse des regionalen Systemhauses liest,
+schreibt den Konzernvertrieb an statt die Niederlassung, die geboten hat.
 
-Deshalb wird `employees_scope` explizit gefuehrt, und ein Konzernwert geht
-NICHT ins Tiering. Lieber "nicht ermittelt" als falsch eingestuft.
+Deshalb wird `employees_scope` explizit gefuehrt. Ein Konzernwert landet
+nicht in `employees`, sondern in `employees_note` - sichtbar, aber nicht
+als Eigenschaft des Bieters ausgegeben.
 """
 from __future__ import annotations
 
@@ -44,7 +45,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from src.longlist.build import tier_for
+from src.longlist.build import _age_days, tier_for
 from src.resolve.normalize import normalize_company
 
 DATA = Path("data")
@@ -168,10 +169,15 @@ def load_enrichment(path: Path) -> list[dict]:
     return out
 
 
-def merge(enriched_path: Path, longlist_path: Path | None = None) -> dict:
-    """Anreicherung einspielen und die Longlist neu einstufen."""
+def merge(enriched_path: Path | None = None,
+          longlist_path: Path | None = None) -> dict:
+    """Anreicherung einspielen und die Tiers nachziehen.
+
+    Ohne enriched_path werden nur die Tiers neu gerechnet - sinnvoll, weil
+    die Aktualitaet des Belegs mit jedem Tag altert.
+    """
     longlist_path = Path(longlist_path or (DATA / "longlist_markt.csv"))
-    records = load_enrichment(Path(enriched_path))
+    records = load_enrichment(Path(enriched_path)) if enriched_path else []
 
     # Drei Schluessel, absteigend nach Verlaesslichkeit. company_id ist der
     # Schluessel, den wir selbst vergeben haben - kommt er zurueck, ist die
@@ -210,6 +216,7 @@ def merge(enriched_path: Path, longlist_path: Path | None = None) -> dict:
             if rec.get("domain"):
                 row["domain"] = rec["domain"]
                 row["domain_source"] = rec.get("domain_source") or "enrichment"
+                stats["domain_uebernommen"] += 1
             row["apollo_industry"] = rec.get("industry") or row["apollo_industry"]
             row["apollo_linkedin"] = rec.get("linkedin") or row["apollo_linkedin"]
 
@@ -230,16 +237,27 @@ def merge(enriched_path: Path, longlist_path: Path | None = None) -> dict:
         else:
             stats["ohne_treffer"] += 1
 
-        # --- Neu einstufen, mit den Werten, die jetzt da sind --------------
+        # --- Tier neu berechnen, OHNE die Mitarbeiterzahl -------------------
+        # Das Tier haengt ausschliesslich an Vergabedaten. Die Anreicherung
+        # aendert daran per Definition nichts - sie fuellt Domain und
+        # Mitarbeiterzahl fuer die Ansprache.
+        # Gerechnet wird trotzdem neu, weil ein Kriterium mit der Zeit
+        # wandert: Die Aktualitaet des Belegs wird jeden Tag schlechter.
+        # Genau dafuer laeuft `retier` auch ohne --from.
+        before_tier = row.get("tier")
         tier, rationale, status = tier_for(
             proof_type=row.get("proof_type", ""),
-            employees=_to_int(row.get("employees")),
+            participations=_to_int(row.get("participations_total")) or 0,
+            proof_age_days=_age_days(row.get("proof_date")),
+            # buyers_total, nicht buyers: die Spalte buyers ist auf 5
+            # Eintraege gekappt und ergaebe nie mehr als 5.
+            buyer_count=(_to_int(row.get("buyers_total"))
+                         or len([b for b in (row.get("buyers") or "").split(";") if b])),
             mixed_lot_only=(row.get("mixed_lot_only") == "ja"),
-            lost_count=_to_int(row.get("bids_lost")) or 0,
-            sole_bidder_wins=_to_int(row.get("sole_bidder_wins")) or 0,
-            open_count=_to_int(row.get("bids_outcome_unknown")) or 0,
         )
         row["tier"], row["tier_rationale"], row["tier_status"] = tier, rationale, status
+        if before_tier and before_tier != tier:
+            stats["tier_geaendert_durch_alterung"] += 1
 
     order = {"A": 0, "B": 1, "C": 2, "D": 3}
     rows.sort(key=lambda r: (order.get(r["tier"], 9),
@@ -258,5 +276,5 @@ def merge(enriched_path: Path, longlist_path: Path | None = None) -> dict:
         "stats": dict(stats),
         "tier_vorher": dict(sorted(before.items())),
         "tier_nachher": dict(sorted(Counter(r["tier"] for r in rows).items())),
-        "final": sum(1 for r in rows if r["tier_status"] == "final"),
+        "mit_domain": sum(1 for r in rows if r.get("domain")),
     }

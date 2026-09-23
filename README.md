@@ -8,7 +8,7 @@ pip install -r requirements.txt
 make demo          # offline gegen Fixtures, zweimal hintereinander = 0 neue Zeilen
 make run           # gegen die echten APIs
 python3 -m src.cli longlist --live --months 12
-make retier FROM=clay-export.csv    # Enrichment einspielen, neu einstufen
+make retier FROM=clay-export.csv    # Domain/Mitarbeiterzahl einspielen
 python3 -m src.verify_proofs --sample 30
 ```
 
@@ -81,20 +81,42 @@ Plattform hat ihn nur anders gemappt. Wer die pauschal als „hat geboten und
 verloren" führt, verkauft eine erfundene Eigenschaft mit amtlicher Beleg-URL
 daneben. Der Unterschied entscheidet den ersten Satz der Ansprache.
 
-### Tiering ist ein eigener Schritt — und das ist der Punkt
+### Tiering ohne Mitarbeiterzahl — und warum das besser ist
 
-Die Einstufung braucht die Mitarbeiterzahl, die es beim Bau der Liste noch
-nicht gibt. Lief beides in einem Zug, landeten **2.464 von 2.468 Zeilen auf
-Tier B** — kein Urteil, sondern ein fehlender Wert in Verkleidung.
+Die erste Fassung stufte nach Größe ein (50–2.000 MA). Ergebnis: **2.464 von
+2.468 Zeilen auf Tier B** — kein Urteil, sondern ein fehlender Wert in
+Verkleidung, weil die Mitarbeiterzahl erst aus dem Enrichment kommt. Und wo
+sie vorlag, war sie bei **5 von 10 Firmen die des Konzerns** statt die des
+bietenden Rechtsträgers (Bechtle 17.000, Computacenter 21.000/UK).
+
+Das Tier hängt deshalb ausschließlich an Vergabedaten:
+
+| Merkmal | Spanne |
+|---|---|
+| Häufigkeit — Verfahren in 12 Monaten | 1 bis 131 |
+| Aktualität — Alter des jüngsten Belegs | Median 177 Tage |
+| Breite — verschiedene Auftraggeber | 626 Firmen mit > 1 |
+| Belegart | 6 Stufen |
 
 ```
-longlist  →  Clay / Apollo  →  retier  →  export
-             Domain + MA        endgültige Tiers
+A   236   laufender Angebotsprozess     (≥ 3 Verfahren, Beleg ≤ 180 Tage)
+B 1.268   wiederkehrend oder aktuell
+C   964   belegt, aber weder häufig noch aktuell
 ```
 
-Jede Zeile trägt `tier_status`: `vorlaeufig_ohne_mitarbeiterzahl` oder
-`final`. Ein Reviewer sieht damit sofort, welche Einstufung auf echten Daten
-beruht. Details und die Konzernfalle in [docs/tiering.md](docs/tiering.md).
+Jede Zeile trägt die nachrechenbare Begründung („131 Verfahren in 12
+Monaten, jüngster Beleg vor 1 Monat, 24 verschiedene Auftraggeber") und
+`tier_status`, das sagt, **worauf** das Tier beruht: `zuschlag_benannt`,
+`zuschlag_erschlossen`, `teilnahme_offen` oder `schwacher_beleg`.
+
+**Gegenprobe:** Von fünf unabhängig per Apollo als ICP-passend bestätigten
+Firmen (63–900 MA) landen drei allein aus den Vergabedaten in Tier A. Die
+Größe korreliert, ohne dass wir sie brauchen.
+
+**Der ehrliche Preis:** Das Tier misst Ausschreibungsaktivität, nicht
+Größenpassung. Bechtle und SVA stehen in A, weil sie ständig bieten. Die
+Größe filtert man nachgelagert über `employees` — sie ist nur kein
+Eingangswert der Einstufung mehr. Details in [docs/tiering.md](docs/tiering.md).
 
 **Belege geprüft:** 30 Zufallsstichproben, **30/30 erreichbar**, alle
 `application/pdf`. Der Prüfer (`src/verify_proofs.py`) testet Statuscode
@@ -169,9 +191,9 @@ Top 20 mit „Why now"-Satz in `data/longlist_signale.csv`, sortiert nach Score.
 - **Der Signalmix ist einseitig.** 651 von 669 Accounts hängen an
   `zuschlag_gewonnen`. Die Rangfolge misst damit vor allem Aktualität.
 - **Die Domain-Resolution ist die Engstelle**, nicht die Kosten. Von 2.468
-  Zeilen haben erst 10 eine angereicherte Domain; der Rest läuft über Clay.
-  Solange das offen ist, bleiben die Tiers vorläufig — nachlesbar in
-  `tier_status`, nicht versteckt.
+  Zeilen haben erst 11 eine angereicherte Domain; der Rest läuft über Clay.
+  Die Tiers stehen davon unabhängig fest — fehlt eine Domain, fehlt der
+  Ansprechweg, nicht die Einstufung.
 - **ICP-Präzision an der Spitze ist nicht perfekt.** Unter den Top 20 stehen
   Siemens (Gebäudeautomation), ein Sensorhersteller und ein Verkehrszähl-
   anbieter. CPV belegt Teilnahme, nicht Geschäftsmodell — der Systemhaus-
