@@ -91,6 +91,7 @@ def cmd_run(args: argparse.Namespace) -> int:
     store = DeltaStore()
     selected = [args.source] if args.source else list(SOURCES)
     grand = defaultdict(int)
+    failed: list[str] = []
 
     for name in selected:
         src = SOURCES[name]()
@@ -107,6 +108,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                     stats[store.upsert(sig, run_id)] += 1
         except Exception as exc:                       # noqa: BLE001
             errors = f"{type(exc).__name__}: {exc}"
+            failed.append(name)
             print(f"  ! {errors}")
 
         store.finish_run(run_id, stats, errors)
@@ -119,8 +121,21 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     print(f"\nGesamt: neu {grand['new']}, geaendert {grand['changed']}, "
           f"unveraendert {grand['unchanged']}")
+
+    # Ein Lauf, in dem jede Quelle gescheitert ist, sieht in den Zahlen
+    # identisch aus wie ein sauberer zweiter Lauf: ueberall Null. Ohne diese
+    # Unterscheidung meldet die Pipeline einen Totalausfall als Erfolg -
+    # in einer Live-Demo der schlimmste denkbare Fall.
+    if failed:
+        print(f"\nFEHLER in {len(failed)} von {len(selected)} Quellen: "
+              f"{', '.join(failed)}")
+        print("-> Die Nullen oben bedeuten AUSFALL, nicht 'keine Aenderungen'.")
+        store.close()
+        return 1
+
     if grand["new"] == 0 and grand["changed"] == 0:
-        print("-> Keine Aenderungen. Genau so soll ein zweiter Lauf aussehen.")
+        print("-> Keine Aenderungen bei fehlerfreiem Lauf. "
+              "Genau so soll ein zweiter Lauf aussehen.")
     store.close()
     return 0
 
