@@ -3,8 +3,11 @@ __pycache__/
 *.pyc
 .env
 
-# Vollfixtures bleiben lokal (der DOEE-Export aus 12 Monaten wiegt 86 MB).
-# Eingecheckt ist nur das kleine *.sample.json fuer `make demo`.
-fixtures/vergabe_dovs.json
-fixtures/ted.json
-fixtures/ba_jobs.json
+# Vollfixtures bleiben lokal (der DOEE-Export aus 12 Monaten wiegt 75 MB).
+# Eingecheckt ist nur das *.sample.json fuer `make demo`.
+#
+# Als hier noch drei feste Dateinamen standen, rutschte die neu hinzugekommene
+# vergabe_dovs.longlist.json am Filter vorbei. Deshalb jetzt: alles in
+# fixtures/ ist ignoriert, ausser den Samples und dem Code, der sie erzeugt.
+fixtures/*.json
+!fixtures/*.sample.json

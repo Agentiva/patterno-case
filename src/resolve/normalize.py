@@ -98,8 +98,63 @@ def split_consortium(name: str) -> tuple[list[str], bool]:
     return (parts or [name.strip()]), True
 
 
+# Vergabestellen schreiben in das Bieter-Namensfeld regelmaessig Prosa statt
+# einer Firmierung. Echte Beispiele aus 12 Monaten DOEE:
+#   "Keine Angabe - der Zuschlag erging fuer die Lose an mehrere Bieter, ..."
+#   "Es wurden 4 Anbieter fuer die Rahmenvereinbarung bezuschlagt. Gemaess §39 ..."
+# Normalisiert ergibt das einen company_id-Key wie jeder andere, und der Satz
+# landet als Firma in der Longlist - mit Beleg-URL, also besonders glaubwuerdig.
+JUNK_NAME_PREFIXES = (
+    "keine angabe", "keineangabe", "k a", "na", "entfaellt", "entfallen",
+    "es wurden", "es wurde", "siehe", "diverse", "verschiedene", "mehrere",
+    "nicht vergeben", "aufgehoben", "kein zuschlag", "unbekannt",
+)
+JUNK_NAME_MARKERS = ("bezuschlagt", "gemaess §", "gemaess  §", " vgv", "los 1 und")
+MAX_NAME_LEN = 120
+
+# Gattungsbegriffe, die als ganzer Eintrag auftreten: Die Vergabestelle hat
+# die Rolle hingeschrieben statt den Namen. "Auftragnehmer GmbH" bleibt
+# erlaubt, "Auftragnehmer" nicht - deshalb exakter Vergleich, kein Teilstring.
+JUNK_NAME_EXACT = {
+    "auftragnehmer", "auftraggeber", "bieter", "anbieter", "lieferant",
+    "firma", "unternehmen", "konsortium", "arge", "bietergemeinschaft",
+    "n n", "nn", "entfaellt", "keine", "anonym", "vertraulich",
+}
+
+# "Mitglied 1: cimt consulting ag" - Positionsangabe aus der Losaufstellung.
+_ROLE_PREFIX = re.compile(
+    r"^\s*(mitglied|bieter|los|teilnehmer|partner|nr\.?)\s*\d*\s*[:\-]\s*",
+    re.IGNORECASE)
+
+
+def strip_role_prefix(name: str) -> str:
+    return _ROLE_PREFIX.sub("", name or "").strip()
+
+
+def is_company_name(name: str) -> tuple[bool, str | None]:
+    """Sieht der Eintrag ueberhaupt nach einer Firmierung aus?"""
+    raw = strip_role_prefix(name)
+    if len(raw) < 3:
+        return False, "zu kurz"
+    if len(raw) > MAX_NAME_LEN:
+        return False, f"laenger als {MAX_NAME_LEN} Zeichen - vermutlich Freitext"
+    norm = normalize_company(raw)
+    if not norm:
+        return False, "nach Normalisierung leer"
+    if norm in JUNK_NAME_EXACT:
+        return False, "Rollenbezeichnung statt Firmierung"
+    if any(norm.startswith(p) for p in JUNK_NAME_PREFIXES):
+        return False, "Platzhaltertext statt Firmierung"
+    if any(m in fold(raw) for m in JUNK_NAME_MARKERS):
+        return False, "Satzbaustein aus der Bekanntmachung statt Firmierung"
+    return True, None
+
+
 def check_exclusion(name: str) -> tuple[bool, str | None]:
     """Gegen die Ausschlusslisten pruefen. Rueckgabe: (ausgeschlossen, Grund)."""
+    ok, why = is_company_name(name)
+    if not ok:
+        return True, f"kein Firmenname: {why}"
     norm = normalize_company(name)
     for reason, entries in EXCLUSION_LISTS.items():
         for entry in entries:

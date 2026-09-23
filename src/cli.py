@@ -18,7 +18,7 @@ from collections import defaultdict
 from datetime import date
 from pathlib import Path
 
-from src.config import ENRICH_SCORE_THRESHOLD
+from src.config import ENRICH_SCORE_THRESHOLD, SIGNAL_WEIGHTS
 from src.resolve.normalize import (
     check_exclusion, needs_review, normalize_company,
     resolution_confidence, split_consortium,
@@ -94,6 +94,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     grand = defaultdict(int)
     failed: list[str] = []
 
+    seen_types: dict[str, int] = defaultdict(int)
+
     for name in selected:
         src = SOURCES[name]()
         run_id = store.start_run(name)
@@ -105,6 +107,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         try:
             for raw in src.fetch(since, live=args.live):
                 stats["in"] += 1
+                seen_types[raw.signal_type] += 1
                 for sig in resolve(raw, store):
                     stats[store.upsert(sig, run_id)] += 1
         except Exception as exc:                       # noqa: BLE001
@@ -122,6 +125,20 @@ def cmd_run(args: argparse.Namespace) -> int:
 
     print(f"\nGesamt: neu {grand['new']}, geaendert {grand['changed']}, "
           f"unveraendert {grand['unchanged']}")
+
+    # Ein konfigurierter Signaltyp, der nie feuert, ist der teuerste Fehler
+    # dieses Projekts gewesen: "rahmenvertrag_laeuft_aus" las monatelang ein
+    # Feld, das der Feed nicht fuehrt, und schwieg dabei. Ein leeres Signal
+    # sieht in jeder Statistik aus wie "diese Woche kein Anlass".
+    # Deshalb nennt jeder Lauf, was gefeuert hat - und was nicht.
+    print("\nSignaltypen in diesem Lauf:")
+    for stype in sorted(SIGNAL_WEIGHTS, key=lambda s: -SIGNAL_WEIGHTS[s]):
+        n = seen_types.get(stype, 0)
+        print(f"  {'ok ' if n else '-- '}{stype:<34}{n:>6}")
+    stale = [s for s in SIGNAL_WEIGHTS if not seen_types.get(s)]
+    if stale and not failed:
+        print(f"  -> {len(stale)} Typ(en) ohne Treffer. Pruefen, ob das an den "
+              f"Daten liegt oder am Feldnamen.")
 
     # Ein Lauf, in dem jede Quelle gescheitert ist, sieht in den Zahlen
     # identisch aus wie ein sauberer zweiter Lauf: ueberall Null. Ohne diese
@@ -286,19 +303,44 @@ def cmd_longlist(args: argparse.Namespace) -> int:
     from src.config import CPV_IT_PREFIXES
     from src.sources.dovs import VergabeSource
 
+    from src.resolve.cpv import classify
+
+    # Eigener Fixture-Slot: Der 12-Monats-Korpus der Longlist und das
+    # 3-Monats-Fenster von `run` duerfen sich nicht gegenseitig ueberschreiben.
     src = VergabeSource(months=args.months)
+    src.fixture_variant = "longlist"
+    # Der Longlist-Korpus ist beim Speichern schon auf IT gefiltert (s.u.),
+    # also klein genug, um vollstaendig zu bleiben. Eine Kuerzung hier waere
+    # ein stiller Datenverlust in genau der Zahl, die der Case bewertet.
+    src.MAX_FIXTURE_ROWS = 200_000
+
     if args.live:
         releases = []
+        failed_months = []
         cursor = date.today()
         from datetime import timedelta
         for _ in range(args.months):
             ym = cursor.strftime("%Y-%m")
             try:
-                releases.extend(src._download_month(ym))
-                print(f"  . {ym}")
+                month = src._download_month(ym)
+                # Nur IT-relevante Releases in die Fixture. 12 Monate DOEE
+                # sind ~190.000 Bekanntmachungen; fuer die Longlist zaehlen
+                # nur die, die der CPV-Dominanzpruefung standhalten. Das
+                # spart Platte, ohne die Auswertung zu veraendern - gefiltert
+                # wird mit exakt derselben Funktion wie unten.
+                keep = [r for r in month if classify(r.get("tender") or {})["is_it"]]
+                releases.extend(keep)
+                print(f"  . {ym}: {len(month)} Releases, davon {len(keep)} IT")
             except Exception as exc:                       # noqa: BLE001
+                failed_months.append(ym)
                 print(f"  ! {ym}: {exc}")
             cursor = cursor.replace(day=1) - timedelta(days=1)
+        if failed_months:
+            # Eine Longlist aus 7 statt 12 Monaten ist eine andere Longlist.
+            # Das darf nicht in einer Zeile Logausgabe untergehen.
+            print(f"\n  ! {len(failed_months)} von {args.months} Monaten fehlen: "
+                  f"{', '.join(failed_months)}")
+            print("  ! Die Marktabdeckung unten ist entsprechend unvollstaendig.")
         src.save_fixture(releases)
     else:
         releases = src.load_fixture()
@@ -311,8 +353,13 @@ def cmd_longlist(args: argparse.Namespace) -> int:
     s = summary(index)
     print(f"\n{path}: {s['firmen_gesamt']} Firmen")
     print(f"  Tiers: {s['tiers']}")
+    print(f"  Zuschlag benannt: {s['mit_zuschlag_benannt']}, "
+          f"davon Mehrfachzuschlag: {s['mit_mehrfachzuschlag']}")
+    print(f"  Alleinbieter (Zuschlag erschlossen): {s['alleinbieter_gewinner']}")
+    print(f"  unterlegene Bieter: {s['unterlegene_bieter']}, "
+          f"davon mehrfach unterlegen: {s['mehrfach_unterlegen']}")
+    print(f"  Teilnahme belegt, Ausgang offen: {s['ausgang_offen']}")
     print(f"  nur als Konsortialmitglied gesehen: {s['nur_als_konsortialmitglied']}")
-    print(f"  mit Mehrfachzuschlag: {s['mit_mehrfachzuschlag']}")
     print(f"  ohne Domain (Resolution offen): {s['ohne_domain']}")
     return 0
 

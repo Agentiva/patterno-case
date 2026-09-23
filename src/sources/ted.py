@@ -90,7 +90,14 @@ class TEDSource(FixtureMixin):
     name = "ted"
     signal_type = "zuschlag_gewonnen"
 
-    def __init__(self, max_pages: int = 8):
+    # 8 Seiten a 250 waren zu wenig und haben stumm abgeschnitten.
+    # Gemessen am 23.09.2026: Ein 8-Wochen-Fenster enthaelt 2.435 Notices,
+    # geholt wurden 2.000. Der Lauf meldete Erfolg. Beim naechsten Lauf mit
+    # kuerzerem Fenster tauchten 131 Notices erstmals auf und galten als
+    # "neu" - die Pipeline sah also idempotent falsch aus, obwohl sie beim
+    # ersten Mal unvollstaendig war.
+    # Jetzt: grosszuegige Obergrenze UND Abgleich gegen totalNoticeCount.
+    def __init__(self, max_pages: int = 40):
         self.max_pages = max_pages
 
     def _query(self, since: date) -> str:
@@ -127,18 +134,34 @@ class TEDSource(FixtureMixin):
             notices: list[dict] = []
             token: str | None = None
             query = self._query(since)
+            expected: int | None = None
             for page in range(self.max_pages):
                 try:
                     data = self._call(query, token)
                 except requests.HTTPError as exc:
                     print(f"  ! {self.name}: Seite {page + 1} -> {exc}")
                     break
+                if expected is None:
+                    expected = data.get("totalNoticeCount")
                 batch = data.get("notices") or data.get("results") or []
                 notices.extend(batch)
                 token = data.get("iterationNextToken")
+                if data.get("timedOut"):
+                    print(f"  ! {self.name}: Seite {page + 1} - Server meldet "
+                          f"timedOut, Ergebnis unvollstaendig")
                 print(f"  . {self.name}: Seite {page + 1}, {len(batch)} Notices")
                 if not token or len(batch) < PAGE_SIZE:
                     break
+
+            # Ohne diesen Abgleich ist eine abgeschnittene Antwort von einer
+            # vollstaendigen nicht zu unterscheiden.
+            if expected is not None and len(notices) < expected:
+                print(f"  ! {self.name}: nur {len(notices)} von {expected} "
+                      f"Notices geholt - Fenster verkleinern oder max_pages "
+                      f"erhoehen. Die Longlist ist sonst unvollstaendig.")
+            elif expected is not None:
+                print(f"  . {self.name}: {len(notices)}/{expected} Notices "
+                      f"vollstaendig")
             self.save_fixture(notices)
         else:
             notices = self.load_fixture()

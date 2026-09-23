@@ -96,10 +96,12 @@ JOB_TITLE_EXCLUDE = [
 SIGNAL_WEIGHTS = {
     "nachpruefung_vergabekammer": 10,   # hat verloren und klagt -> maximaler Schmerz
     "rahmenvertrag_laeuft_aus": 9,      # 6-9 Mon. vor Ablauf -> Neuausschreibung kommt
+    "angebot_ohne_zuschlag": 8,         # geboten, ein anderer bekam den Zuschlag
     "offene_ausschreibung_im_profil": 8,
     "bid_rolle_ausgeschrieben": 7,
     "zuschlag_gewonnen": 6,
     "leitungswechsel_public": 5,
+    "teilnahme_belegt": 5,              # geboten, Ausgang aus den Daten nicht ableitbar
     "neue_public_referenz": 4,
 }
 
@@ -122,8 +124,17 @@ DAMPEN_FLOOR = 0.40
 RESOLUTION_MIN_CONFIDENCE = 0.70
 
 # Enrichment kostet Geld, Signale nicht -> erst scoren, dann anreichern.
-# ACHTUNG: Der Wert ist ein Startpunkt, kein Ergebnis. Er MUSS nach dem
-# ersten Lauf gegen echte Daten an der beobachteten Score-Verteilung
-# kalibriert werden (Ziel: ~20-30 % der Accounts ueber der Schwelle).
-# Siehe README, Abschnitt "Was nicht funktioniert".
-ENRICH_SCORE_THRESHOLD = 45
+#
+# KALIBRIERT, nicht geraten. Gemessen am Lauf vom 23.09.2026 ueber 648
+# Accounts mit Signal aus 8 Wochen:
+#     Schwelle 30 -> 354 Accounts (55 %)
+#     Schwelle 35 -> 237 Accounts (37 %)
+#     Schwelle 40 -> 186 Accounts (29 %)   <- gewaehlt
+#     Schwelle 45 ->  38 Accounts ( 6 %)
+#     Schwelle 50 ->  29 Accounts ( 4 %)
+# Ziel war ein Korridor von 20-30 %: genug Volumen fuer eine Woche Outbound,
+# ohne den Longtail mitzubezahlen. Zwischen 40 und 45 liegt eine Klippe -
+# dort endet die Gruppe mit mehreren oder hoeher gewichteten Signalen.
+# Der Wert gehoert nach jedem groesseren Quellen- oder Gewichtungswechsel
+# erneut gegen die Verteilung geprueft.
+ENRICH_SCORE_THRESHOLD = 40

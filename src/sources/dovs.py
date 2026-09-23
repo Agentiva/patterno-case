@@ -34,10 +34,28 @@ from typing import Any, Iterable
 import requests
 
 from src.resolve.cpv import classify
+from src.resolve.normalize import normalize_company
+from src.resolve.parties import bidder_parties, winner_keys
 from src.sources.base import FixtureMixin
 from src.store import RawSignal
 
 EXPORT_URL = "https://oeffentlichevergabe.de/api/notice-exports"
+NOTICE_URL = "https://oeffentlichevergabe.de/api/notices/{id}"
+
+
+def notice_url(notice_id: str, fmt: str = "pdf") -> str:
+    """Belegbare, im Browser lesbare URL einer Bekanntmachung.
+
+    Verifiziert am 23.09.2026:
+      /api/notices/<release id>              -> 200, application/xml
+      /api/notices/<release id>?format=pdf   -> 200, application/pdf
+      /api/notices/<ocid>                    -> 404
+      /ui/de/notice/<beliebig>               -> 200, aber nur die SPA-Huelle
+    """
+    if not notice_id:
+        return ""
+    base = NOTICE_URL.format(id=notice_id)
+    return f"{base}?format={fmt}" if fmt else base
 
 # Fenster fuer das Rahmenvertrags-Signal: 6-9 Monate vor Vertragsende
 FRAMEWORK_LEAD_MIN_DAYS = 180
@@ -131,15 +149,42 @@ class VergabeSource(FixtureMixin):
             return
         cpv = verdict["cpv_codes"]
 
-        ocid = rel.get("ocid") or rel.get("id") or ""
-        url = f"https://oeffentlichevergabe.de/ui/de/notice/{ocid}"
+        ocid = rel.get("ocid") or ""
+        # ACHTUNG: ocid und id sind NICHT dasselbe.
+        #   ocid = das Verfahren  (ocds-mnwr74-<uuid>)  -> in der API 404
+        #   id   = die einzelne Bekanntmachung (<uuid>) -> die wollen wir
+        # Die erste Version nutzte die ocid und baute daraus eine /ui/-URL.
+        # Ergebnis: Die Seite laedt (HTTP 200, SPA-Huelle) und zeigt im
+        # Browser "Wir koennen diese Seite nicht finden". Ein HTTP-Check haette
+        # das NICHT gefunden - deshalb verlinken wir jetzt die API, deren
+        # Status ehrlich ist.
+        notice_id = rel.get("id") or ""
+        url = notice_url(notice_id)
         buyer = (rel.get("buyer") or {}).get("name")
         title = tender.get("title") or ""
+
+        # Vertragslaufzeiten haengen am LOS, nicht am Zuschlag.
+        # Gemessen am 23.09.2026 in 20.000 Releases:
+        #   awards[].contractPeriod        ->      0 Treffer
+        #   tender.lots[].contractPeriod   -> 15.716 Treffer
+        # Die erste Version las das Award-Feld. Folge: Der Signaltyp
+        # rahmenvertrag_laeuft_aus - laut eigener Modulbeschreibung "der
+        # wertvollste" - hat in keinem einzigen Lauf gefeuert, ohne Fehler.
+        # Ein leeres Feld sieht eben genauso aus wie "kein Vertragsende".
+        lot_period = {
+            lot.get("id"): (lot.get("contractPeriod") or {})
+            for lot in (tender.get("lots") or []) if lot.get("id")
+        }
 
         # --- Typ A + C: Zuschlag / Rahmenvertrags-Ablauf ---------------------
         for award in rel.get("awards") or []:
             award_date = _iso(award.get("date")) or _iso(rel.get("date"))
             period_end = _iso((award.get("contractPeriod") or {}).get("endDate"))
+            if not period_end:
+                for lot_id in award.get("relatedLots") or []:
+                    period_end = _iso(lot_period.get(lot_id, {}).get("endDate"))
+                    if period_end:
+                        break
 
             for supplier in award.get("suppliers") or []:
                 sup_name = (supplier.get("name") or "").strip()
@@ -149,7 +194,8 @@ class VergabeSource(FixtureMixin):
                 place = addr.get("locality") or addr.get("region")
 
                 base_payload = {
-                    "ocid": ocid, "cpv": cpv[:8], "mixed_lot": verdict["mixed_lot_warning"], "buyer": buyer,
+                    "ocid": ocid, "notice_id": notice_id, "xml_url": notice_url(notice_id, ""),
+                    "cpv": cpv[:8], "mixed_lot": verdict["mixed_lot_warning"], "buyer": buyer,
                     "award_id": award.get("id"),
                     "value": (award.get("value") or {}).get("amount"),
                     "currency": (award.get("value") or {}).get("currency"),
@@ -191,6 +237,86 @@ class VergabeSource(FixtureMixin):
                             payload={**base_payload, "days_to_expiry": days_left},
                         )
 
+        # --- Typ A/C fuer namentlich benannte BIETER --------------------------
+        # Ohne diesen Block sieht der Signalmotor nur die benannten Gewinner,
+        # waehrend die Longlist aus derselben Quelle die ganze Bieterseite
+        # kennt: 751 Zuschlagszeilen gegen 5.735 Bieterzeilen in 12 Monaten.
+        # Die Einstufung des Ausgangs kommt aus src/resolve/parties.py, damit
+        # hier und in der Longlist garantiert dieselbe Regel gilt.
+        won = winner_keys(rel)
+        rel_date = _iso(rel.get("date")) or today.isoformat()
+        # Bieter haengen an keinem einzelnen Los. Als Bezug fuer den
+        # Vertragsablauf nehmen wir das FRUEHESTE Vertragsende des Verfahrens:
+        # Wer nachfassen will, muss sich am ersten auslaufenden Los orientieren.
+        ends = sorted(e for e in (
+            (lot.get("contractPeriod") or {}).get("endDate")
+            for lot in (tender.get("lots") or [])) if e)
+        earliest_end = _iso(ends[0]) if ends else None
+
+        for bidder in bidder_parties(rel):
+            name = bidder["name"]
+            if normalize_company(name) in won:
+                continue                       # kommt schon aus dem Award-Block
+            addr = (bidder["party"].get("address") or {})
+            place = addr.get("locality") or addr.get("region")
+            outcome = bidder["outcome"]
+
+            payload = {
+                "ocid": ocid, "notice_id": notice_id,
+                "xml_url": notice_url(notice_id, ""),
+                "cpv": cpv[:8], "mixed_lot": verdict["mixed_lot_warning"],
+                "buyer": buyer, "outcome": outcome,
+                "bidder_count": bidder["bidder_count"],
+                "contract_end": earliest_end,
+                "postal_code": addr.get("postalCode"),
+                "supplier_id": bidder["party"].get("id"),
+            }
+
+            # Ein einziger Bieter in einer Zuschlagsbekanntmachung hat
+            # gewonnen - erschlossen, nicht benannt. Das steht im Payload,
+            # damit der erste Satz der Ansprache es beruecksichtigen kann.
+            if outcome == "alleinbieter_gewonnen":
+                sig_type = "zuschlag_gewonnen"
+            elif outcome == "unterlegen":
+                sig_type = "angebot_ohne_zuschlag"
+            else:
+                sig_type = "teilnahme_belegt"
+
+            if rel_date >= since.isoformat():
+                yield RawSignal(
+                    source=self.name,
+                    external_id=f"{ocid}:bidder:{normalize_company(name)[:40]}",
+                    signal_type=sig_type,
+                    event_date=rel_date,
+                    org_name_raw=name,
+                    org_place=place,
+                    source_url=url,
+                    title=title,
+                    payload=payload,
+                )
+
+            # Ein auslaufender Rahmenvertrag ist nur fuer den Auftragnehmer
+            # ein Anlass. Ein unterlegener Bieter hat keinen Vertrag, der
+            # ablaeuft - fuer ihn waere es die naechste Ausschreibung, und
+            # die steht hier nicht.
+            if earliest_end and outcome == "alleinbieter_gewonnen":
+                try:
+                    days_left = (date.fromisoformat(earliest_end) - today).days
+                except ValueError:
+                    days_left = -1
+                if FRAMEWORK_LEAD_MIN_DAYS <= days_left <= FRAMEWORK_LEAD_MAX_DAYS:
+                    yield RawSignal(
+                        source=self.name,
+                        external_id=f"{ocid}:expiry:bidder:{normalize_company(name)[:40]}",
+                        signal_type="rahmenvertrag_laeuft_aus",
+                        event_date=today.isoformat(),
+                        org_name_raw=name,
+                        org_place=place,
+                        source_url=url,
+                        title=title,
+                        payload={**payload, "days_to_expiry": days_left},
+                    )
+
         # --- Typ B: offenes Verfahren mit naher Frist -------------------------
         # Hier ist der Adressat NICHT der Bieter, sondern ein Account aus
         # Longlist 1, dessen CPV-/Regionsprofil passt. Das Matching passiert
@@ -212,7 +338,8 @@ class VergabeSource(FixtureMixin):
                     source_url=url,
                     title=title,
                     payload={
-                        "ocid": ocid, "cpv": cpv[:8], "mixed_lot": verdict["mixed_lot_warning"],
+                        "ocid": ocid, "notice_id": notice_id, "xml_url": notice_url(notice_id, ""),
+                    "cpv": cpv[:8], "mixed_lot": verdict["mixed_lot_warning"],
                         "deadline": deadline, "days_to_deadline": days_left,
                         "is_buyer_side": True,
                         "value": (tender.get("value") or {}).get("amount"),
