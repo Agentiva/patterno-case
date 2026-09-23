@@ -36,12 +36,24 @@ class FixtureMixin:
     def fixture_path(self) -> Path:
         return FIXTURE_DIR / f"{self.name}.json"
 
+    def sample_path(self) -> Path:
+        """Kleines, versioniertes Sample fuer `make demo`.
+
+        Die Vollfixtures sind zu gross fuers Repo (der DOEE-Export aus 12
+        Monaten wiegt 86 MB). Sie bleiben lokal und stehen in .gitignore;
+        eingecheckt ist nur das Sample, damit ein frischer Clone sofort
+        `make demo` fahren kann.
+        """
+        return FIXTURE_DIR / f"{self.name}.sample.json"
+
     def load_fixture(self) -> list[dict]:
         p = self.fixture_path()
         if not p.exists():
+            p = self.sample_path()
+        if not p.exists():
             raise FileNotFoundError(
-                f"Fixture fehlt: {p}\n"
-                f"Einmal mit --live laufen lassen, dann wird sie geschrieben."
+                f"Weder Fixture noch Sample vorhanden: {self.fixture_path()}\n"
+                f"Einmal mit --live laufen lassen, dann wird die Fixture geschrieben."
             )
         return json.loads(p.read_text(encoding="utf-8"))
 
