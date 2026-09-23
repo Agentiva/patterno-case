@@ -15,3 +15,9 @@ Bietergemeinschaft, oeffentlicher Inhouse-Dienstleister, Wettbewerber,
 einkaufsseitige Stellenanzeige, Rahmenvertrag kurz vor Ablauf, Umlaute.
 
 `make run` (live) ueberschreibt die Dateien mit echten API-Antworten.
+
+---
+## Stand 23.09.2026: echte Daten
+
+`make run` lief erstmals gegen die Live-APIs. Die Fixtures wurden dabei mit
+echten Antworten ueberschrieben und sind nicht mehr synthetisch.

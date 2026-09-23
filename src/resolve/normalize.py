@@ -118,22 +118,39 @@ def name_similarity(a: str, b: str) -> float:
     return len(ta & tb) / len(ta | tb)
 
 
+# Vertrauen in die QUELLE, unabhaengig von den Einzelfeldern.
+# Ein Gewinnername aus einer amtlichen Zuschlagsbekanntmachung ist ein Faktum,
+# kein Schaetzwert - auch dann, wenn die Bekanntmachung keinen Ort mitliefert.
+# Ohne diesen Prior bestraft das Modell eine Quelle dafuer, dass sie ein Feld
+# nicht fuehrt, und alle 516 TED-Treffer landen faelschlich in der
+# Review-Queue (am 23.09.2026 genau so passiert).
+SOURCE_PRIOR = {
+    "vergabe_dovs": 0.75,   # amtlich, eForms/OCDS, mit Adressblock
+    "ted": 0.72,            # amtlich, aber ohne Gewinnerort
+    "ba_jobs": 0.50,        # Arbeitgeber-Freitext, kein Register, kein Bezug
+}
+DEFAULT_PRIOR = 0.50
+
+
 def resolution_confidence(
     name_sim: float,
     place_match: bool,
     has_register_id: bool = False,
     impressum_verified: bool = False,
+    source: str | None = None,
 ) -> float:
-    """Ein transparenter, additiver Score statt einer Blackbox.
+    """Transparenter, additiver Score statt Blackbox.
 
-    Jede Komponente ist im Export als eigene Spalte sichtbar, damit eine
-    Stichprobenpruefung nachvollziehen kann, woher die Confidence kommt.
+    Basis ist das Quellenvertrauen, darauf kommen die verifizierbaren
+    Einzelmerkmale. Jede Komponente ist im Export sichtbar, damit eine
+    Stichprobenpruefung nachvollziehen kann, woher die Zahl stammt.
     """
-    score = 0.55 * min(name_sim, 1.0)
+    base = SOURCE_PRIOR.get(source or "", DEFAULT_PRIOR)
+    score = base * min(name_sim, 1.0)
     if place_match:
-        score += 0.15
+        score += 0.10
     if has_register_id:
-        score += 0.20          # HRB + Registergericht ist der haerteste Beleg
+        score += 0.15          # HRB/Registergericht ist der haerteste Beleg
     if impressum_verified:
         score += 0.15          # Impressum nennt denselben Namen -> Domain sitzt
     return round(min(score, 1.0), 3)

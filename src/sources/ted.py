@@ -30,7 +30,7 @@ from typing import Any, Iterable
 
 import requests
 
-from src.config import CPV_IT_PREFIXES
+from src.config import CPV_IT_ROOTS_TED
 from src.sources.base import FixtureMixin
 from src.store import RawSignal
 
@@ -38,12 +38,13 @@ SEARCH_URL = "https://api.ted.europa.eu/v3/notices/search"
 PAGE_SIZE = 250          # laut Doku das Maximum pro Seite
 
 FIELDS = [
-    "publication-number", "publication-date", "notice-type", "form-type",
-    "notice-title", "buyer-name", "buyer-country",
-    "classification-cpv", "winner-name", "winner-country",
-    "organisation-name-serv-prov", "organisation-city-serv-prov",
-    "organisation-country-serv-prov", "award-criterion-type",
-    "total-value", "deadline-receipt-request",
+    "publication-number", "publication-date", "notice-type",
+    "notice-title", "buyer-name",
+    "classification-cpv", "total-value",
+    # Gewinner. NUR diese Felder - siehe Warnung unten.
+    "winner-name", "winner-country", "winner-post-code", "winner-size",
+    # Vertragsende fuer das Rahmenvertrags-Ablauf-Signal
+    "contract-duration-end-date-lot",
 ]
 
 
@@ -95,12 +96,13 @@ class TEDSource(FixtureMixin):
     def _query(self, since: date) -> str:
         """TED Expert-Query. CPV-Praefixe als OR-Kette, Land DE,
         nur Zuschlagsbekanntmachungen ab dem Stichtag."""
-        cpv = " OR ".join(f"classification-cpv={p}*" for p in CPV_IT_PREFIXES)
+        # TED akzeptiert keine CPV-Praefixe (HTTP 400), nur vollstaendige
+        # 8-stellige Wurzelcodes. Die Hierarchie loest der Server selbst auf.
+        cpv = " ".join(CPV_IT_ROOTS_TED)
         return (
-            f"({cpv}) "
+            f"classification-cpv IN ({cpv}) "
             f"AND buyer-country=DEU "
-            f"AND publication-date>={since.strftime('%Y%m%d')} "
-            f"AND notice-type=can-standard"
+            f"AND publication-date>={since.strftime('%Y%m%d')}"
         )
 
     def _call(self, query: str, token: str | None) -> dict:
@@ -150,11 +152,19 @@ class TEDSource(FixtureMixin):
             buyer = _first(n.get("buyer-name"))
             cpv = _all_strings(n.get("classification-cpv"))[:8]
 
-            # Gewinner steht je nach eForms-Variante in unterschiedlichen
-            # Feldern. Beide pruefen, sonst verliert man die Haelfte.
-            winners = (_all_strings(n.get("winner-name"))
-                       or _all_strings(n.get("organisation-name-serv-prov")))
-            cities = _all_strings(n.get("organisation-city-serv-prov"))
+            # ACHTUNG - am 23.09.2026 an echten Daten verifiziert:
+            # `organisation-name-serv-prov` ist NICHT der Gewinner, sondern
+            # der Dienstleister des VERFAHRENS. Beispiel 535269-2026:
+            #   winner-name                 = "Innovative Datensysteme GmbH indasys"
+            #   organisation-name-serv-prov = "abakus Gesellschaft fuer Vergaberecht mbH"
+            # Das ist die begleitende Vergaberechtskanzlei. Wer dieses Feld
+            # als Fallback nimmt, spuelt Kanzleien und Berater als vermeintliche
+            # Bieter in die Liste - und `organisation-city-serv-prov` ist deren
+            # Ort, nicht der des Gewinners.
+            # Deshalb: ausschliesslich winner-*. Lieber eine Luecke als ein
+            # falscher Datensatz.
+            winners = _all_strings(n.get("winner-name"))
+            post_codes = _all_strings(n.get("winner-post-code"))
 
             for idx, winner in enumerate(dict.fromkeys(winners)):
                 yield RawSignal(
@@ -163,7 +173,7 @@ class TEDSource(FixtureMixin):
                     signal_type=self.signal_type,
                     event_date=pub_date,
                     org_name_raw=winner,
-                    org_place=cities[idx] if idx < len(cities) else (cities[0] if cities else None),
+                    org_place=None,   # TED liefert keinen Gewinnerort, nur PLZ
                     source_url=f"https://ted.europa.eu/en/notice/-/detail/{pub}",
                     title=title,
                     payload={
@@ -172,6 +182,9 @@ class TEDSource(FixtureMixin):
                         "cpv": cpv,
                         "value": _first(n.get("total-value")),
                         "notice_type": _first(n.get("notice-type")),
+                        "winner_post_code": post_codes[idx] if idx < len(post_codes) else None,
+                        "winner_country": _first(n.get("winner-country")),
+                        "contract_end": _first(n.get("contract-duration-end-date-lot")),
                         "source_scope": "EU_oberschwellig",
                     },
                 )

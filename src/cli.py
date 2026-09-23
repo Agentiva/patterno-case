@@ -62,6 +62,7 @@ def resolve(sig: RawSignal, store: DeltaStore) -> list[RawSignal]:
             place_match=bool(sig.org_place),
             has_register_id=bool((sig.payload or {}).get("supplier_id")),
             impressum_verified=False,
+            source=sig.source,
         )
         if is_consortium:
             conf -= 0.10          # ARGE-Zuordnung ist systematisch unsicherer
@@ -145,8 +146,16 @@ def cmd_export(args: argparse.Namespace) -> int:
     DATA.mkdir(exist_ok=True)
     rows = store.active_signals(days=args.days)
 
+    # Welche Firmen sind ueber CPV-gefilterte VERGABEDATEN belegt IT?
+    # Nur die bilden das ICP-Universum aus Aufgabe 1.
+    it_universe = {
+        (dict(r)["company_id"] or dict(r)["org_name_raw"])
+        for r in rows if dict(r)["source"] in ("vergabe_dovs", "ted")
+    }
+
     by_company: dict[str, list[dict]] = defaultdict(list)
     buyer_side: list[dict] = []
+    needs_icp_check: list[dict] = []
     for r in rows:
         d = dict(r)
         d["payload"] = json.loads(d["payload"] or "{}")
@@ -158,14 +167,38 @@ def cmd_export(args: argparse.Namespace) -> int:
         if d["payload"].get("is_buyer_side"):
             buyer_side.append(d)
             continue
-        by_company[d["company_id"] or d["org_name_raw"]].append(d)
+
+        key = d["company_id"] or d["org_name_raw"]
+        # Eine Stellenanzeige allein macht kein IT-Systemhaus. "Bid Manager"
+        # sucht auch Max Boegl (Bau), HAMBURG WASSER (Versorger, uebrigens
+        # Auftraggeberseite) und TRON gGmbH (Biotech). Gemessen am 23.09.2026:
+        # von 31 reinen Stellenanzeigen-Accounts waren ~4 IT-Systemhaeuser,
+        # also rund 13 % Praezision.
+        # Deshalb: Job-Signale zaehlen nur fuer Firmen, die ueber
+        # CPV-gefilterte Vergabedaten bereits als IT belegt sind. Alle
+        # anderen wandern in einen Pruefbestand und NICHT ins Outbound.
+        if d["source"] == "ba_jobs" and key not in it_universe:
+            needs_icp_check.append(d)
+            continue
+        by_company[key].append(d)
+
+    # Tier aus Longlist 1 (Aufgabe 1) uebernehmen. Das ist die im Case
+    # geforderte Verschraenkung: Aufgabe 1 liefert das Universum und die
+    # Einstufung, Aufgabe 2 den woechentlichen Anlass.
+    tier_map: dict[str, str] = {}
+    ll = DATA / "longlist_markt.csv"
+    if ll.exists():
+        with ll.open(encoding="utf-8-sig") as fh:
+            for row in csv.DictReader(fh):
+                tier_map[row["company_id"]] = row["tier"]
+        print(f"Tiers aus {ll.name} geladen: {len(tier_map)} Firmen")
+    else:
+        print(f"WARNUNG: {ll.name} fehlt - alle Accounts fallen auf Tier C "
+              f"zurueck. Erst 'python3 -m src.cli longlist --live' laufen lassen.")
 
     out = []
     for company_id, sigs in by_company.items():
-        # Tier kommt in der Vollversion aus Longlist 1 (JOIN ueber die Domain).
-        # Ohne diesen Join bleibt es bei C - und das wird auch so exportiert,
-        # statt eine Einstufung zu erfinden.
-        tier = "C"
+        tier = tier_map.get(company_id, "C")
         score, comp = score_account(sigs, tier=tier)
         # Der Why-now-Satz MUSS aus dem Signal kommen, das den Score treibt.
         driver = comp.pop("driver_signal", None) or sigs[0]
@@ -182,7 +215,7 @@ def cmd_export(args: argparse.Namespace) -> int:
             "signal_anzahl": comp["signal_count"],
             "signal_typen": ";".join(comp["distinct_signal_types"]),
             "match_confidence": driver.get("match_confidence"),
-            "in_longlist_1": "",      # wird beim Join mit Longlist 1 gesetzt
+            "in_longlist_1": "ja" if company_id in tier_map else "nein",
             "enrich": "ja" if score >= ENRICH_SCORE_THRESHOLD else "nein",
             "why_now": build_why_now(driver),
             "score_components": json.dumps(comp, ensure_ascii=False),
@@ -217,6 +250,19 @@ def cmd_export(args: argparse.Namespace) -> int:
             w.writeheader()
             w.writerows(brows)
         print(f"{bpath}: {len(brows)} offene Verfahren (Join-Input, kein Outbound)")
+
+    if needs_icp_check:
+        npath = DATA / "job_signale_ohne_icp_beleg.csv"
+        nrows = [{
+            "firma_raw": n["org_name_raw"], "ort": n.get("org_place") or "",
+            "titel": n["title"], "datum": n["event_date"],
+            "quell_url": n["source_url"],
+            "hinweis": "Bid-Rolle ausgeschrieben, aber kein IT-Vergabebeleg - ICP vor Ansprache pruefen",
+        } for n in needs_icp_check]
+        with npath.open("w", encoding="utf-8-sig", newline="") as fh:
+            w = csv.DictWriter(fh, fieldnames=list(nrows[0]), quoting=csv.QUOTE_ALL)
+            w.writeheader(); w.writerows(nrows)
+        print(f"{npath}: {len(nrows)} Job-Signale ohne IT-Beleg (Pruefbestand, kein Outbound)")
 
     review = store.conn.execute("SELECT COUNT(*) c FROM review_queue").fetchone()["c"]
     print(f"Review-Queue: {review} Treffer unter Confidence-Schwelle (nicht geraten)")

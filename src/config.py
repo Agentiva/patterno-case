@@ -6,7 +6,10 @@ lesen und aendern koennen.
 """
 
 # --- CPV-Profil IT-Systemhaus -------------------------------------------------
-# Wir filtern auf CPV-Praefixe. Alles was mit diesen Ziffern beginnt, zaehlt.
+# Zwei Darstellungen, weil die beiden Quellen unterschiedlich filtern:
+#
+# OCDS (oeffentlichevergabe.de) liefert die CPV-Codes als Strings im Datensatz;
+# wir filtern clientseitig ueber Praefixe.
 CPV_IT_PREFIXES = [
     "48",        # Softwarepakete und Informationssysteme
     "72",        # IT-Dienstleistungen: Beratung, Entwicklung, Internet, Support
@@ -15,6 +18,20 @@ CPV_IT_PREFIXES = [
     "5032",      # Wartung/Reparatur PC
     "5161",      # Installation von Computern und Bueroausstattung
     "642",       # Telekommunikationsdienste
+]
+
+# TED filtert serverseitig und akzeptiert KEINE Praefixe:
+#   classification-cpv=72  -> HTTP 400 QUERY_UNSUPPORTED_FIELD_VALUE
+# Stattdessen der vollstaendige 8-stellige Wurzelcode. Verifiziert am
+# 23.09.2026: "=72000000" liefert dasselbe Ergebnis wie "=72*" (398.987
+# Notices), die Hierarchie wird also serverseitig mit aufgeloest.
+CPV_IT_ROOTS_TED = [
+    "48000000",  # Softwarepakete und Informationssysteme
+    "72000000",  # IT-Dienstleistungen
+    "30200000",  # Datenverarbeitungsgeraete
+    "50300000",  # Wartung/Reparatur DV-Technik
+    "51600000",  # Installation von Computern
+    "64200000",  # Telekommunikationsdienste
 ]
 
 # --- Ausschlusslisten ---------------------------------------------------------
@@ -34,6 +51,11 @@ COMPETITORS_AND_PORTALS = [
     "cosinex", "administration intelligence", "healy hudson", "dtad",
     "deutsches ausschreibungsblatt", "subreport", "vergabe24", "evergabe",
     "staatsanzeiger", "bi-medien", "tender24", "ausschreibungen-deutschland",
+    # Vergaberechtskanzleien und Verfahrensbegleiter. Tauchen in TED als
+    # "organisation-*-serv-prov" auf und wurden dort frueher faelschlich als
+    # Gewinner gelesen - zweite Verteidigungslinie zur Feldkorrektur.
+    "vergaberecht", "rechtsanwalt", "rechtsanwaelte", "kanzlei",
+    "ausschreibungsberatung", "vergabeberatung",
 ]
 
 # Reine Produkt-/Handels-/Personalunternehmen -> kein Systemhaus-Motion.
