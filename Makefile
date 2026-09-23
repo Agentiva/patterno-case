@@ -16,3 +16,12 @@ runlog:
 
 reset:           ## Delta-Store leeren (Demo von vorn)
 	rm -f data/state.sqlite
+
+enrich-dry:      ## Credit-Kalkulation ohne Abruf
+	python3 -m src.enrich.apollo --dry-run
+
+enrich-domains:  ## Stufe 1-3, kostenlos
+	python3 -m src.enrich.apollo --stage domains
+
+enrich-all:      ## Domains + Firmographics + Kontakte (kostet Credits)
+	python3 -m src.enrich.apollo --stage all

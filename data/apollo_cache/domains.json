@@ -1,0 +1,38 @@
+{
+ "sva system vertrieb alexander": {
+  "domain": "sva.de",
+  "confidence": 0.9,
+  "stage": 1,
+  "note": "MCP-Lookup, manuell bestaetigt"
+ },
+ "adesso": {
+  "domain": "adesso.de",
+  "confidence": 0.9,
+  "stage": 1,
+  "note": "MCP-Lookup, manuell bestaetigt"
+ },
+ "mr datentechnik vertriebs-und service": {
+  "domain": "mr-daten.de",
+  "confidence": 0.9,
+  "stage": 1,
+  "note": "MCP-Lookup, manuell bestaetigt"
+ },
+ "wbs it-service": {
+  "domain": "wbs-it.de",
+  "confidence": 0.9,
+  "stage": 1,
+  "note": "MCP-Lookup, manuell bestaetigt"
+ },
+ "converge technology solutions germany": {
+  "domain": "convergetp.de",
+  "confidence": 0.95,
+  "stage": 3,
+  "note": "Impressum bestaetigt (Name + Ort + HRB)"
+ },
+ "beneering": {
+  "domain": "beneering.com",
+  "confidence": 0.95,
+  "stage": 3,
+  "note": "Impressum bestaetigt (Name + Ort + HRB)"
+ }
+}
