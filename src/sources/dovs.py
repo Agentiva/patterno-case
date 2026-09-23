@@ -33,7 +33,7 @@ from typing import Any, Iterable
 
 import requests
 
-from src.config import CPV_IT_PREFIXES
+from src.resolve.cpv import classify
 from src.sources.base import FixtureMixin
 from src.store import RawSignal
 
@@ -126,21 +126,10 @@ class VergabeSource(FixtureMixin):
         self, rel: dict, since: date, today: date
     ) -> Iterable[RawSignal]:
         tender = rel.get("tender") or {}
-
-        cpv: list[str] = []
-        main = (tender.get("classification") or {}).get("id")
-        if main:
-            cpv.append(str(main))
-        for item in tender.get("items") or []:
-            cid = (item.get("classification") or {}).get("id")
-            if cid:
-                cpv.append(str(cid))
-        for add in tender.get("additionalClassifications") or []:
-            if add.get("id"):
-                cpv.append(str(add["id"]))
-
-        if not _matches_cpv(cpv):
+        verdict = classify(tender)
+        if not verdict["is_it"]:
             return
+        cpv = verdict["cpv_codes"]
 
         ocid = rel.get("ocid") or rel.get("id") or ""
         url = f"https://oeffentlichevergabe.de/ui/de/notice/{ocid}"
@@ -160,7 +149,7 @@ class VergabeSource(FixtureMixin):
                 place = addr.get("locality") or addr.get("region")
 
                 base_payload = {
-                    "ocid": ocid, "cpv": sorted(set(cpv))[:8], "buyer": buyer,
+                    "ocid": ocid, "cpv": cpv[:8], "mixed_lot": verdict["mixed_lot_warning"], "buyer": buyer,
                     "award_id": award.get("id"),
                     "value": (award.get("value") or {}).get("amount"),
                     "currency": (award.get("value") or {}).get("currency"),
@@ -223,7 +212,7 @@ class VergabeSource(FixtureMixin):
                     source_url=url,
                     title=title,
                     payload={
-                        "ocid": ocid, "cpv": sorted(set(cpv))[:8],
+                        "ocid": ocid, "cpv": cpv[:8], "mixed_lot": verdict["mixed_lot_warning"],
                         "deadline": deadline, "days_to_deadline": days_left,
                         "is_buyer_side": True,
                         "value": (tender.get("value") or {}).get("amount"),

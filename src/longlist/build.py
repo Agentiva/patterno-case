@@ -30,6 +30,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterable
 
+from src.resolve.cpv import classify
 from src.resolve.normalize import (
     check_exclusion, normalize_company, resolution_confidence, split_consortium,
 )
@@ -69,7 +70,23 @@ class Company:
 
     @property
     def award_count(self) -> int:
+        """Anzahl VERFAHREN, nicht Zuschlagszeilen.
+
+        Eine Mehrlos-Rahmenvereinbarung erzeugt dutzende Zuschlagszeilen mit
+        derselben OCID. Wer die zaehlt, haelt einen einzigen Rahmenvertrag
+        faelschlich fuer 112 gewonnene Verfahren.
+        """
+        return len({a["ocid"] for a in self.awards if a.get("ocid")})
+
+    @property
+    def award_rows(self) -> int:
         return len(self.awards)
+
+    @property
+    def from_mixed_lot_only(self) -> bool:
+        """Nur ueber Sammelvergaben mit fachfremden Gewerken belegt -
+        schwacher IT-Beleg, gehoert nicht nach Tier A/B."""
+        return bool(self.awards) and all(a.get("mixed_lot") for a in self.awards)
 
     @property
     def last_award(self) -> str | None:
@@ -107,6 +124,9 @@ def assign_tier(company: Company, proof_type: str) -> tuple[str, str]:
     """Tiering mit ausgeschriebener Begruendung - die Begruendung landet als
     eigene Spalte im Export, damit eine Pruefung nicht raten muss."""
     strong = proof_type in ("P1_zuschlag_24m", "P2_zuschlag_48m")
+    if company.from_mixed_lot_only:
+        return "C", ("nur ueber Sammelvergabe mit fachfremden Gewerken belegt - "
+                     "IT-Eigenschaft nicht gesichert, vor Ansprache pruefen")
     emp = company.employees
 
     if strong and emp is not None and 50 <= emp <= 2000:
@@ -130,16 +150,10 @@ def companies_from_awards(releases: Iterable[dict], cpv_ok) -> dict[str, Company
 
     for rel in releases:
         tender = rel.get("tender") or {}
-        cpv: list[str] = []
-        main = (tender.get("classification") or {}).get("id")
-        if main:
-            cpv.append(str(main))
-        for item in tender.get("items") or []:
-            cid = (item.get("classification") or {}).get("id")
-            if cid:
-                cpv.append(str(cid))
-        if not cpv_ok(cpv):
+        verdict = classify(tender)
+        if not verdict["is_it"]:
             continue
+        cpv = verdict["cpv_codes"]
 
         ocid = rel.get("ocid") or rel.get("id") or ""
         buyer = (rel.get("buyer") or {}).get("name")
@@ -174,7 +188,9 @@ def companies_from_awards(releases: Iterable[dict], cpv_ok) -> dict[str, Company
                     c.sources.add("dovs")
                     c.awards.append({
                         "ocid": ocid, "date": adate, "buyer": buyer, "title": title,
-                        "cpv": sorted(set(cpv))[:8],
+                        "cpv": cpv[:8], "main_cpv": verdict["main_cpv"],
+                        "it_share": verdict["it_share"],
+                        "mixed_lot": verdict["mixed_lot_warning"],
                         "value": (award.get("value") or {}).get("amount"),
                         "consortium": is_consortium,
                         "url": f"https://oeffentlichevergabe.de/ui/de/notice/{ocid}",
@@ -224,7 +240,8 @@ COLUMNS = [
     "company_id", "legal_name", "domain", "domain_confidence", "domain_source",
     "city", "postal_code", "employees", "tier", "tier_rationale",
     "proof_type", "proof_confidence", "proof_url", "proof_date",
-    "awards_total", "last_award_date", "buyers", "cpv_profile",
+    "awards_total", "award_rows", "last_award_date", "buyers", "cpv_profile",
+    "main_cpv", "mixed_lot_only",
     "consortium_only", "supplier_ids", "sources", "first_seen",
 ]
 
@@ -255,9 +272,12 @@ def export(index: dict[str, Company], path: Path | None = None,
             "proof_url": purl or "",
             "proof_date": pdate or "",
             "awards_total": c.award_count,
+            "award_rows": c.award_rows,
             "last_award_date": (c.last_award or "")[:10],
             "buyers": ";".join(c.buyers[:5]),
             "cpv_profile": ";".join(c.cpv_profile),
+            "main_cpv": next((a.get("main_cpv") for a in c.awards if a.get("main_cpv")), ""),
+            "mixed_lot_only": "ja" if c.from_mixed_lot_only else "nein",
             "consortium_only": "ja" if c.consortium_only else "nein",
             "supplier_ids": ";".join(sorted(c.supplier_ids)),
             "sources": ";".join(sorted(c.sources)),

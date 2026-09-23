@@ -45,9 +45,15 @@ class FixtureMixin:
             )
         return json.loads(p.read_text(encoding="utf-8"))
 
+    # 200 war zu wenig: Die Longlist braucht alle Zuschlagsbekanntmachungen
+    # aus 12 Monaten. Bei 200 Releases blieben nach dem IT-Filter 14 uebrig,
+    # davon keine mit Zuschlag -> Longlist leer.
+    MAX_FIXTURE_ROWS = 20000
+
     def save_fixture(self, rows: list[dict]) -> None:
         p = self.fixture_path()
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(
-            json.dumps(rows[:200], ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(rows[: self.MAX_FIXTURE_ROWS], ensure_ascii=False),
+            encoding="utf-8",
         )
