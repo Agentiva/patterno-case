@@ -302,6 +302,57 @@ def cmd_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_retier(args: argparse.Namespace) -> int:
+    """Schritt 3 der Kette: longlist -> Enrichment -> retier.
+
+    Ohne diesen Schritt steht in jeder Zeile dasselbe Tier, weil die
+    Mitarbeiterzahl beim Bau der Liste noch nicht existiert.
+    """
+    from src.longlist.enrich_merge import merge
+
+    src = Path(args.src)
+    if not src.exists():
+        sys.exit(f"{src} nicht gefunden")
+
+    res = merge(src)
+    s = res["stats"]
+    print(f"Quelle: {src}  ({res['angereicherte_saetze']} Saetze)")
+    print(f"Longlist: {res['pfad']}  ({res['zeilen']} Zeilen)\n")
+    print(f"  gematcht                     {s.get('gematcht', 0):>6}")
+    print(f"  davon MA-Zahl uebernommen    {s.get('mitarbeiterzahl_nutzbar', 0):>6}")
+    print(f"  davon MA-Zahl verworfen      {s.get('mitarbeiterzahl_verworfen', 0):>6}"
+          f"   (Konzernwert oder unklar - siehe employees_note)")
+    print(f"  ohne Treffer                 {s.get('ohne_treffer', 0):>6}")
+    print(f"\n  Tier vorher:  {res['tier_vorher']}")
+    print(f"  Tier nachher: {res['tier_nachher']}")
+    print(f"  endgueltig eingestuft: {res['final']} von {res['zeilen']} "
+          f"({res['final'] / res['zeilen']:.0%})")
+
+    # ACHTUNG: Hier stand zuerst `if res["final"] == 0`. Das misst den
+    # Gesamtzustand der Datei, nicht die Wirkung DIESES Laufs - eine Quelle
+    # mit falschen Spaltennamen lief damit als Erfolg durch, solange ein
+    # frueherer Lauf schon irgendetwas eingestuft hatte. Geprueft werden
+    # muss, was dieser Aufruf beigetragen hat.
+    matched = s.get("gematcht", 0)
+    with_headcount = (s.get("mitarbeiterzahl_nutzbar", 0)
+                      + s.get("mitarbeiterzahl_verworfen", 0))
+    if matched == 0:
+        print(f"\n  ! Keine einzige Zeile aus {src.name} konnte zugeordnet "
+              f"werden.\n  ! Erwartet wird company_id (bevorzugt), sonst "
+              f"legal_name oder domain.")
+        return 1
+    if with_headcount == 0:
+        print(f"\n  ! {matched} Zeilen zugeordnet, aber keine einzige "
+              f"Mitarbeiterzahl gelesen.\n  ! Die Tiers bleiben damit "
+              f"vorlaeufig. Erwartete Spaltennamen u.a.:\n  !   employees, "
+              f"employee_count, mitarbeiterzahl, estimated_num_employees, "
+              f"headcount")
+        return 1
+    print("\n  -> Jetzt 'python3 -m src.cli export' laufen lassen, damit die "
+          "Signal-Liste\n     die neuen Tiers uebernimmt.")
+    return 0
+
+
 def cmd_runlog(_: argparse.Namespace) -> int:
     store = DeltaStore()
     print(f"{'run':>4} {'quelle':<16} {'start':<20} {'in':>5} {'neu':>5} "
@@ -376,6 +427,17 @@ def cmd_longlist(args: argparse.Namespace) -> int:
     print(f"  Teilnahme belegt, Ausgang offen: {s['ausgang_offen']}")
     print(f"  nur als Konsortialmitglied gesehen: {s['nur_als_konsortialmitglied']}")
     print(f"  ohne Domain (Resolution offen): {s['ohne_domain']}")
+
+    # Ein Tier ohne Mitarbeiterzahl unterscheidet nichts. Das darf nicht
+    # erst beim Oeffnen der CSV auffallen.
+    vorlaeufig = sum(1 for c in index.values() if c.employees is None)
+    if vorlaeufig:
+        print(f"\n  ! {vorlaeufig} von {s['firmen_gesamt']} Zeilen sind VORLAEUFIG "
+              f"eingestuft (keine Mitarbeiterzahl).")
+        print(f"  ! Das Tier trennt bis dahin nur nach Belegart, nicht nach "
+              f"Groesse.")
+        print(f"  ! Naechster Schritt: Domain + Mitarbeiterzahl anreichern, dann")
+        print(f"  !   python3 -m src.cli retier --from <clay-export.csv>")
     return 0
 
 
@@ -396,6 +458,13 @@ def main() -> int:
     ll.add_argument("--live", action="store_true")
     ll.add_argument("--months", type=int, default=36)
     ll.set_defaults(func=cmd_longlist)
+
+    rt = sub.add_parser(
+        "retier",
+        help="Angereicherte Domains/Mitarbeiterzahlen einspielen und neu einstufen")
+    rt.add_argument("--from", dest="src", required=True,
+                    help="CSV aus Clay oder JSON aus src.enrich.apollo")
+    rt.set_defaults(func=cmd_retier)
 
     lg = sub.add_parser("runlog", help="Laufprotokoll")
     lg.set_defaults(func=cmd_runlog)

@@ -8,6 +8,7 @@ pip install -r requirements.txt
 make demo          # offline gegen Fixtures, zweimal hintereinander = 0 neue Zeilen
 make run           # gegen die echten APIs
 python3 -m src.cli longlist --live --months 12
+make retier FROM=clay-export.csv    # Enrichment einspielen, neu einstufen
 python3 -m src.verify_proofs --sample 30
 ```
 
@@ -79,6 +80,21 @@ Gewinnerangabe haben **3.987 genau einen Bieter** — der hat gewonnen, die
 Plattform hat ihn nur anders gemappt. Wer die pauschal als „hat geboten und
 verloren" führt, verkauft eine erfundene Eigenschaft mit amtlicher Beleg-URL
 daneben. Der Unterschied entscheidet den ersten Satz der Ansprache.
+
+### Tiering ist ein eigener Schritt — und das ist der Punkt
+
+Die Einstufung braucht die Mitarbeiterzahl, die es beim Bau der Liste noch
+nicht gibt. Lief beides in einem Zug, landeten **2.464 von 2.468 Zeilen auf
+Tier B** — kein Urteil, sondern ein fehlender Wert in Verkleidung.
+
+```
+longlist  →  Clay / Apollo  →  retier  →  export
+             Domain + MA        endgültige Tiers
+```
+
+Jede Zeile trägt `tier_status`: `vorlaeufig_ohne_mitarbeiterzahl` oder
+`final`. Ein Reviewer sieht damit sofort, welche Einstufung auf echten Daten
+beruht. Details und die Konzernfalle in [docs/tiering.md](docs/tiering.md).
 
 **Belege geprüft:** 30 Zufallsstichproben, **30/30 erreichbar**, alle
 `application/pdf`. Der Prüfer (`src/verify_proofs.py`) testet Statuscode
@@ -152,8 +168,10 @@ Top 20 mit „Why now"-Satz in `data/longlist_signale.csv`, sortiert nach Score.
   ein stummes Signal war der teuerste Fehler dieses Projekts.
 - **Der Signalmix ist einseitig.** 651 von 669 Accounts hängen an
   `zuschlag_gewonnen`. Die Rangfolge misst damit vor allem Aktualität.
-- **Die Domain-Resolution ist die Engstelle**, nicht die Kosten. Alle 2.468
-  Zeilen sind noch ohne Domain; angereichert wird über Clay.
+- **Die Domain-Resolution ist die Engstelle**, nicht die Kosten. Von 2.468
+  Zeilen haben erst 10 eine angereicherte Domain; der Rest läuft über Clay.
+  Solange das offen ist, bleiben die Tiers vorläufig — nachlesbar in
+  `tier_status`, nicht versteckt.
 - **ICP-Präzision an der Spitze ist nicht perfekt.** Unter den Top 20 stehen
   Siemens (Gebäudeautomation), ein Sensorhersteller und ein Verkehrszähl-
   anbieter. CPV belegt Teilnahme, nicht Geschäftsmodell — der Systemhaus-
@@ -233,4 +251,5 @@ in die Review-Queue fällt und Menschenzeit kostet.
 | `data/job_signale_ohne_icp_beleg.csv` | Prüfbestand, **kein Outbound** |
 | `docs/waterfalls.md` | Enrichment-Waterfalls mit gemessenen Quoten |
 | `docs/apollo_filter.md` | Apollo-Filter für Clay, aus echten Titeln |
+| `docs/tiering.md` | warum Tiering ein eigener Schritt ist, Konzernfalle |
 | `docs/betriebsmodell.md` | Clay / Supabase / Attio, Kosten je Lead |

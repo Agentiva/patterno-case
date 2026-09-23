@@ -206,47 +206,92 @@ def proof_for(company: Company, today: date) -> tuple[str, str | None, str | Non
     return ptype, url, last[:10]
 
 
-def assign_tier(company: Company, proof_type: str) -> tuple[str, str]:
-    """Tiering mit ausgeschriebener Begruendung - die Begruendung landet als
-    eigene Spalte im Export, damit eine Pruefung nicht raten muss."""
-    strong = proof_type in ("P1_zuschlag_24m", "P2_zuschlag_48m",
-                            "P1B_bieter_unterlegen", "P1C_alleinbieter",
-                            "P1D_ausgang_offen")
-    if company.from_mixed_lot_only:
-        return "C", ("nur ueber Sammelvergabe mit fachfremden Gewerken belegt - "
-                     "IT-Eigenschaft nicht gesichert, vor Ansprache pruefen")
-    emp = company.employees
+# === WARUM DAS TIERING NICHT AN DER COMPANY-KLASSE HAENGT ===
+# Das Tiering braucht zwei Dinge, die zu verschiedenen Zeitpunkten entstehen:
+#   Beleg + Verfahrenszahlen -> aus den Vergabedaten, sofort verfuegbar
+#   Mitarbeiterzahl          -> aus dem Enrichment, Stunden bis Tage spaeter
+#
+# Solange beides in einem Schritt lief, entschied die Longlist ueber die
+# Einstufung, bevor es etwas zum Einstufen gab: employees war immer None,
+# also fiel JEDE Firma in denselben Zweig. Ergebnis waren 2.464 von 2.468
+# Zeilen auf Tier B - das sah aus wie ein Urteil, war aber ein fehlender
+# Wert in Verkleidung. Ein Tier, das nichts unterscheidet, ist als
+# Priorisierung wertlos.
+#
+# Deshalb ist die Regel jetzt eine reine Funktion auf Werten. Sie laeuft
+# zweimal: einmal beim Bau der Liste (vorlaeufig) und einmal nach dem
+# Enrichment (final), aufgerufen ueber `python3 -m src.cli retier`.
+# tier_status sagt in jeder Zeile, welcher der beiden Faelle zutrifft.
+TIER_STATUS_FINAL = "final"
+TIER_STATUS_PROVISIONAL = "vorlaeufig_ohne_mitarbeiterzahl"
+
+STRONG_PROOFS = ("P1_zuschlag_24m", "P2_zuschlag_48m", "P1B_bieter_unterlegen",
+                 "P1C_alleinbieter", "P1D_ausgang_offen")
+
+
+def tier_for(proof_type: str, employees: int | None, mixed_lot_only: bool,
+             lost_count: int = 0, sole_bidder_wins: int = 0,
+             open_count: int = 0) -> tuple[str, str, str]:
+    """Tier, Begruendung und Status aus reinen Werten.
+
+    Rueckgabe: (tier, tier_rationale, tier_status)
+    """
+    if mixed_lot_only:
+        return ("C", "nur ueber Sammelvergabe mit fachfremden Gewerken belegt - "
+                     "IT-Eigenschaft nicht gesichert, vor Ansprache pruefen",
+                TIER_STATUS_FINAL)
+
+    emp = employees
+    strong = proof_type in STRONG_PROOFS
+    status = TIER_STATUS_FINAL if emp is not None else TIER_STATUS_PROVISIONAL
 
     # Die drei Bieter-Belegarten tragen jeweils eine eigene Begruendung,
     # weil daraus ein anderer Erstsatz wird.
     bid_reason = {
         "P1B_bieter_unterlegen": (
-            f"in {company.lost_count} Verfahren als Bieter gefuehrt, waehrend "
+            f"in {lost_count} Verfahren als Bieter gefuehrt, waehrend "
             f"ein anderer den Zuschlag bekam - Angebotsaufwand ohne Ertrag"),
         "P1C_alleinbieter": (
-            f"in {company.sole_bidder_wins} Verfahren einziger Bieter - Zuschlag "
+            f"in {sole_bidder_wins} Verfahren einziger Bieter - Zuschlag "
             f"erschlossen, nicht benannt; Beleg-URL vor Ansprache pruefen"),
         "P1D_ausgang_offen": (
-            f"in {company.open_count} Verfahren als Bieter gefuehrt, Ausgang aus "
+            f"in {open_count} Verfahren als Bieter gefuehrt, Ausgang aus "
             f"den Daten nicht ableitbar - Teilnahme belegt, Ergebnis offen"),
     }.get(proof_type)
     if bid_reason:
-        if emp is not None and 50 <= emp <= 2000:
-            return "A", f"{bid_reason}; {emp} MA im Zielkorridor 50-2.000"
-        return "B", (f"{bid_reason}; Mitarbeiterzahl "
-                     f"{emp if emp is not None else 'nicht ermittelt'}")
+        if emp is None:
+            return "B", f"{bid_reason}; Mitarbeiterzahl nicht ermittelt", status
+        if 50 <= emp <= 2000:
+            return "A", f"{bid_reason}; {emp} MA im Zielkorridor 50-2.000", status
+        if emp < 50:
+            return "C", f"{bid_reason}; nur {emp} MA - unterhalb des ICP", status
+        return "B", (f"{bid_reason}; {emp} MA - oberhalb des ICP, eigene "
+                     f"Bid-Abteilung wahrscheinlich"), status
 
     if strong and emp is not None and 50 <= emp <= 2000:
-        return "A", f"Zuschlagsbeleg ({proof_type}) und {emp} MA im Zielkorridor 50-2.000"
+        return "A", f"Zuschlagsbeleg ({proof_type}) und {emp} MA im Zielkorridor 50-2.000", status
     if strong and emp is not None and emp < 50:
-        return "B", f"Zuschlagsbeleg, aber nur {emp} MA - kleineres Paket, kuerzerer Zyklus"
+        return "C", f"Zuschlagsbeleg, aber nur {emp} MA - unterhalb des ICP", status
     if strong and emp is not None and emp > 2000:
-        return "B", f"Zuschlagsbeleg, aber {emp} MA - eigene Bid-Abteilung wahrscheinlich, laengerer Zyklus"
+        return "B", f"Zuschlagsbeleg, aber {emp} MA - eigene Bid-Abteilung wahrscheinlich, laengerer Zyklus", status
     if strong:
-        return "B", f"Zuschlagsbeleg ({proof_type}), Mitarbeiterzahl nicht ermittelt"
+        return "B", f"Zuschlagsbeleg ({proof_type}), Mitarbeiterzahl nicht ermittelt", status
     if proof_type in ("P3_rahmenvertrag", "P4_referenz_website", "P5_schwaches_signal"):
-        return "C", "Public-Sector-Bezug belegt, aber kein Zuschlag gefunden - moeglicher Dauerbieter ohne Zuschlag, hoher Bedarf"
-    return "D", "nur Branchen-/Groessenpassung, kein belegter Public-Sector-Bezug"
+        return ("C", "Public-Sector-Bezug belegt, aber kein Zuschlag gefunden - "
+                     "moeglicher Dauerbieter ohne Zuschlag, hoher Bedarf", status)
+    return "D", "nur Branchen-/Groessenpassung, kein belegter Public-Sector-Bezug", status
+
+
+def assign_tier(company: Company, proof_type: str) -> tuple[str, str, str]:
+    """Duenner Adapter: Company -> tier_for()."""
+    return tier_for(
+        proof_type=proof_type,
+        employees=company.employees,
+        mixed_lot_only=company.from_mixed_lot_only,
+        lost_count=company.lost_count,
+        sole_bidder_wins=company.sole_bidder_wins,
+        open_count=company.open_count,
+    )
 
 
 # --- Aufbau -------------------------------------------------------------------
@@ -390,7 +435,8 @@ def capture_recapture(n1: int, n2: int, overlap: int) -> dict:
 # --- Export -------------------------------------------------------------------
 COLUMNS = [
     "company_id", "legal_name", "domain", "domain_confidence", "domain_source",
-    "city", "postal_code", "employees", "tier", "tier_rationale",
+    "city", "postal_code", "employees", "employees_scope",
+    "tier", "tier_status", "tier_rationale",
     "proof_type", "proof_confidence", "proof_url", "proof_date",
     "awards_total", "award_rows", "last_award_date",
     "sole_bidder_wins", "bids_lost", "bids_outcome_unknown",
@@ -409,7 +455,7 @@ def export(index: dict[str, Company], path: Path | None = None,
     rows = []
     for key, c in index.items():
         ptype, purl, pdate = proof_for(c, today)
-        tier, rationale = assign_tier(c, ptype)
+        tier, rationale, tier_status = assign_tier(c, ptype)
         rows.append({
             "company_id": key,
             "legal_name": c.legal_name,
@@ -419,7 +465,9 @@ def export(index: dict[str, Company], path: Path | None = None,
             "city": c.city or "",
             "postal_code": c.postal_code or "",
             "employees": c.employees if c.employees is not None else "",
+            "employees_scope": "",
             "tier": tier,
+            "tier_status": tier_status,
             "tier_rationale": rationale,
             "proof_type": ptype,
             "proof_confidence": PROOF_CONFIDENCE.get(ptype, ""),

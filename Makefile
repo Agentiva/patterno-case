@@ -1,4 +1,4 @@
-.PHONY: demo run export runlog reset
+.PHONY: demo run export runlog reset retier
 
 demo:            ## Offline gegen Fixtures - fuer die Live-Demo
 	python3 -m src.cli run
@@ -9,6 +9,11 @@ run:             ## Gegen die echten APIs
 	python3 -m src.cli export
 
 export:
+	python3 -m src.cli export
+
+retier:          ## Angereicherte Daten einspielen und neu einstufen
+	@test -n "$(FROM)" || (echo "Aufruf: make retier FROM=<clay-export.csv>"; exit 1)
+	python3 -m src.cli retier --from $(FROM)
 	python3 -m src.cli export
 
 runlog:

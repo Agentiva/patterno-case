@@ -1,31 +1,50 @@
-"""Firmographics aus Apollo in die Longlist mergen und neu tiern.
+"""Angereicherte Domains und Mitarbeiterzahlen zurueck in die Longlist - und
+danach NEU EINSTUFEN.
+
+=== WARUM DIESER SCHRITT EIGENSTAENDIG IST ===
+Das Tiering braucht zwei Dinge, die zu verschiedenen Zeitpunkten entstehen:
+
+    Beleg + Verfahrenszahlen   aus den Vergabedaten       sofort
+    Mitarbeiterzahl + Domain   aus Clay / Apollo          spaeter
+
+Solange beides in einem Schritt lief, entschied die Longlist ueber die
+Einstufung, bevor es etwas zum Einstufen gab. `employees` war immer None,
+also fiel jede Firma in denselben Zweig: 2.464 von 2.468 Zeilen auf Tier B.
+Das sah aus wie ein Urteil, war aber ein fehlender Wert in Verkleidung.
+
+Dieses Modul schliesst den Kreis:
+    longlist --live   ->  vorlaeufige Tiers, tier_status = vorlaeufig
+    (Clay / Apollo)   ->  Domain + Mitarbeiterzahl
+    retier            ->  endgueltige Tiers, tier_status = final
 
 === DIE FALLE, DIE HIER ABGEFANGEN WIRD ===
-Apollo loest eine Domain auf den KONZERN auf, die Vergabe geht aber an den
+Apollo loest eine Domain auf den KONZERN auf, die Vergabe ging aber an den
 RECHTSTRAEGER. Zwei Beispiele aus dem Lauf vom 23.09.2026:
 
-  Zuschlag an: "Computacenter AG & Co OHG"  (Deutschland, Kerpen)
-  Apollo:      computacenter.com -> Hatfield, UK, 21.000 MA
+  Zuschlag an: "Computacenter AG & Co OHG"  (Kerpen)
+  Apollo:      computacenter.com -> Hatfield/UK, 21.000 MA
                = die britische Konzernmutter
 
   Zuschlag an: "Bechtle GmbH & Co. KG"      (regionales Systemhaus)
   Apollo:      bechtle.com -> Neckarsulm, 17.000 MA
                = die Bechtle AG, also der Konzern
 
-Fuer unser Tiering ist das falsch: Der ICP zielt auf 50-2.000 Mitarbeitende,
+Fuer das Tiering ist das falsch: Der ICP zielt auf 50-2.000 Mitarbeitende,
 und der bietende Rechtstraeger hat oft einen Bruchteil der Konzerngroesse.
 Wer den Konzernwert uebernimmt, stuft systematisch falsch ein und schreibt
 den Konzernvertrieb an statt die Niederlassung, die tatsaechlich bietet.
 
-Deshalb: headcount_scope wird explizit gefuehrt und im Zweifel als unklar
-markiert, statt eine Zahl als Wahrheit auszugeben.
+Deshalb wird `employees_scope` explizit gefuehrt, und ein Konzernwert geht
+NICHT ins Tiering. Lieber "nicht ermittelt" als falsch eingestuft.
 """
 from __future__ import annotations
 
 import csv
 import json
+from collections import Counter
 from pathlib import Path
 
+from src.longlist.build import tier_for
 from src.resolve.normalize import normalize_company
 
 DATA = Path("data")
@@ -34,20 +53,84 @@ DATA = Path("data")
 # oder Apollo hat auf die Mutter aufgeloest - beides muss geprueft werden.
 ICP_MAX_EMPLOYEES = 2000
 
+# Spaltennamen, unter denen die Anreicherung zurueckkommen darf. Clay laesst
+# den Nutzer frei benennen, Apollo liefert eigene - statt einem starren
+# Schema also eine Liste von Synonymen je Feld.
+FIELD_ALIASES = {
+    "company_id": ("company_id", "companyid"),
+    "legal_name": ("legal_name", "name", "company", "company_name", "firma"),
+    "domain": ("domain", "company_domain", "website", "url", "domain_final"),
+    "employees": ("employees", "employee_count", "mitarbeiter",
+                  "mitarbeiterzahl", "headcount", "estimated_num_employees",
+                  "num_employees", "size"),
+    "country": ("country", "land", "hq_country"),
+    "city": ("city", "ort", "hq_city"),
+    "apollo_name": ("apollo_name", "matched_name", "enriched_name"),
+    "industry": ("industry", "branche", "apollo_industry"),
+    "linkedin": ("linkedin", "linkedin_url", "apollo_linkedin"),
+    "domain_source": ("domain_source", "quelle", "source"),
+}
 
-def classify_headcount(award_name: str, apollo: dict) -> dict:
+
+def _norm_key(k: str) -> str:
+    return (k or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def _pick(row: dict, field: str):
+    """Ersten belegten Alias eines Feldes zurueckgeben."""
+    lookup = {_norm_key(k): v for k, v in row.items()}
+    for alias in FIELD_ALIASES[field]:
+        v = lookup.get(alias)
+        if v not in (None, ""):
+            return v
+    return None
+
+
+def _to_int(value) -> int | None:
+    """'1.234', '1,234', '250-500', 1234.0 -> int oder None.
+
+    Clay und Tabellenprogramme formatieren Zahlen gern mit Tausendertrenner;
+    ungefiltert wird aus '1.234' eine 1 oder ein Fehler.
+    """
+    if value in (None, ""):
+        return None
+    if isinstance(value, (int, float)):
+        return int(value)
+    s = str(value).strip().replace(" ", "")
+    # "10.000+" ist ein Groessenband nach oben. Als None waere die Firma
+    # "unbekannt gross" und liefe ins Tiering, als Zahl faellt sie korrekt
+    # durch die ICP-Oberkante.
+    s = s.rstrip("+").strip()
+    if "-" in s:                      # Groessenband "250-500" -> Mitte
+        parts = [p for p in s.split("-") if p.strip().replace(".", "").replace(",", "").isdigit()]
+        if len(parts) == 2:
+            lo, hi = (_to_int(parts[0]) or 0), (_to_int(parts[1]) or 0)
+            return (lo + hi) // 2 or None
+    s = s.replace(".", "").replace(",", "").replace(" ", "")
+    return int(s) if s.isdigit() else None
+
+
+def _clean_domain(value) -> str:
+    d = str(value or "").strip().lower()
+    for prefix in ("https://", "http://", "www."):
+        if d.startswith(prefix):
+            d = d[len(prefix):]
+    return d.split("/")[0].strip()
+
+
+def classify_headcount(award_name: str, rec: dict) -> dict:
     """Ist die Mitarbeiterzahl die des Bieters oder die des Konzerns?"""
-    apollo_name = apollo.get("name") or ""
-    country = (apollo.get("country") or "").strip()
-    emp = apollo.get("employees")
+    apollo_name = rec.get("apollo_name") or rec.get("legal_name") or ""
+    country = (rec.get("country") or "").strip()
+    emp = rec.get("employees")
 
     flags = []
-    if country and country.lower() not in ("germany", "deutschland"):
-        flags.append(f"Apollo-Sitz {country}, Zuschlag ging an deutschen Rechtstraeger")
+    if country and country.lower() not in ("germany", "deutschland", "de"):
+        flags.append(f"Sitz {country}, Zuschlag ging an deutschen Rechtstraeger")
     if isinstance(emp, int) and emp > ICP_MAX_EMPLOYEES:
         flags.append(f"{emp} MA liegt ueber der ICP-Oberkante {ICP_MAX_EMPLOYEES}")
-    if normalize_company(apollo_name) != normalize_company(award_name):
-        flags.append(f"Name weicht ab: Apollo '{apollo_name}' vs. Zuschlag '{award_name}'")
+    if apollo_name and normalize_company(apollo_name) != normalize_company(award_name):
+        flags.append(f"Name weicht ab: '{apollo_name}' vs. Zuschlag '{award_name}'")
 
     if not flags:
         return {"scope": "rechtstraeger", "note": "", "usable_for_tier": True}
@@ -59,46 +142,121 @@ def classify_headcount(award_name: str, apollo: dict) -> dict:
     }
 
 
-def merge(enriched_path: Path, longlist_path: Path | None = None) -> Path:
-    longlist_path = longlist_path or (DATA / "longlist_markt.csv")
-    records = json.loads(Path(enriched_path).read_text(encoding="utf-8"))
-    by_norm = {normalize_company(r["name"]): r for r in records}
+def load_enrichment(path: Path) -> list[dict]:
+    """Angereicherte Daten aus CSV (Clay-Export) oder JSON (Apollo) lesen."""
+    text = path.read_text(encoding="utf-8-sig")
+    if path.suffix.lower() == ".json":
+        raw = json.loads(text)
+        rows = raw if isinstance(raw, list) else raw.get("records") or []
+    else:
+        rows = list(csv.DictReader(text.splitlines()))
+
+    out = []
+    for r in rows:
+        out.append({
+            "company_id": _pick(r, "company_id"),
+            "legal_name": _pick(r, "legal_name"),
+            "domain": _clean_domain(_pick(r, "domain")),
+            "employees": _to_int(_pick(r, "employees")),
+            "country": _pick(r, "country"),
+            "city": _pick(r, "city"),
+            "apollo_name": _pick(r, "apollo_name"),
+            "industry": _pick(r, "industry"),
+            "linkedin": _pick(r, "linkedin"),
+            "domain_source": _pick(r, "domain_source"),
+        })
+    return out
+
+
+def merge(enriched_path: Path, longlist_path: Path | None = None) -> dict:
+    """Anreicherung einspielen und die Longlist neu einstufen."""
+    longlist_path = Path(longlist_path or (DATA / "longlist_markt.csv"))
+    records = load_enrichment(Path(enriched_path))
+
+    # Drei Schluessel, absteigend nach Verlaesslichkeit. company_id ist der
+    # Schluessel, den wir selbst vergeben haben - kommt er zurueck, ist die
+    # Zuordnung eindeutig. Name und Domain sind Rueckfallebenen fuer den
+    # Fall, dass Clay die Spalte nicht mitfuehrt.
+    by_id = {r["company_id"]: r for r in records if r.get("company_id")}
+    by_name = {normalize_company(r["legal_name"]): r
+               for r in records if r.get("legal_name")}
     by_domain = {r["domain"]: r for r in records if r.get("domain")}
 
     with longlist_path.open(encoding="utf-8-sig") as fh:
         rows = list(csv.DictReader(fh))
-        fields = list(rows[0].keys()) if rows else []
+    if not rows:
+        raise SystemExit(f"{longlist_path} ist leer")
 
-    new_cols = ["domain", "domain_source", "employees", "employees_scope",
-                "employees_note", "apollo_industry", "apollo_phone",
-                "apollo_linkedin", "apollo_city"]
-    for c in new_cols:
+    fields = list(rows[0].keys())
+    for c in ("employees_scope", "employees_note", "tier_status",
+              "apollo_industry", "apollo_linkedin"):
         if c not in fields:
             fields.append(c)
 
-    hits = 0
-    for row in rows:
-        rec = by_domain.get(row.get("domain") or "") or by_norm.get(row["company_id"])
-        if not rec:
-            continue
-        hits += 1
-        verdict = classify_headcount(row["legal_name"], rec)
-        row["domain"] = rec.get("domain") or row.get("domain", "")
-        row["domain_source"] = "apollo_lookup"
-        row["employees"] = rec.get("employees") if verdict["usable_for_tier"] else ""
-        row["employees_scope"] = verdict["scope"]
-        row["employees_note"] = verdict["note"]
-        row["apollo_industry"] = rec.get("industry") or ""
-        row["apollo_phone"] = rec.get("phone") or ""
-        row["apollo_linkedin"] = rec.get("linkedin") or ""
-        row["apollo_city"] = rec.get("city") or ""
+    before = Counter(r.get("tier", "") for r in rows)
+    stats = Counter()
 
     for row in rows:
-        for c in new_cols:
-            row.setdefault(c, "")
+        row.setdefault("employees_scope", "")
+        row.setdefault("employees_note", "")
+        row.setdefault("apollo_industry", "")
+        row.setdefault("apollo_linkedin", "")
+
+        rec = (by_id.get(row["company_id"])
+               or by_name.get(row["company_id"])
+               or by_domain.get(row.get("domain") or ""))
+        if rec:
+            stats["gematcht"] += 1
+            if rec.get("domain"):
+                row["domain"] = rec["domain"]
+                row["domain_source"] = rec.get("domain_source") or "enrichment"
+            row["apollo_industry"] = rec.get("industry") or row["apollo_industry"]
+            row["apollo_linkedin"] = rec.get("linkedin") or row["apollo_linkedin"]
+
+            verdict = classify_headcount(row["legal_name"], rec)
+            row["employees_scope"] = verdict["scope"]
+            row["employees_note"] = verdict["note"]
+            if rec.get("employees") is not None and verdict["usable_for_tier"]:
+                row["employees"] = rec["employees"]
+                stats["mitarbeiterzahl_nutzbar"] += 1
+            elif rec.get("employees") is not None:
+                # Wert bekannt, aber Konzern oder unklar -> Spalte leer
+                # lassen, damit das Tiering ihn nicht benutzt. Die Zahl
+                # steht in employees_note und geht also nicht verloren.
+                row["employees"] = ""
+                row["employees_note"] = (
+                    f"{verdict['note']} | gemeldeter Wert: {rec['employees']}")
+                stats["mitarbeiterzahl_verworfen"] += 1
+        else:
+            stats["ohne_treffer"] += 1
+
+        # --- Neu einstufen, mit den Werten, die jetzt da sind --------------
+        tier, rationale, status = tier_for(
+            proof_type=row.get("proof_type", ""),
+            employees=_to_int(row.get("employees")),
+            mixed_lot_only=(row.get("mixed_lot_only") == "ja"),
+            lost_count=_to_int(row.get("bids_lost")) or 0,
+            sole_bidder_wins=_to_int(row.get("sole_bidder_wins")) or 0,
+            open_count=_to_int(row.get("bids_outcome_unknown")) or 0,
+        )
+        row["tier"], row["tier_rationale"], row["tier_status"] = tier, rationale, status
+
+    order = {"A": 0, "B": 1, "C": 2, "D": 3}
+    rows.sort(key=lambda r: (order.get(r["tier"], 9),
+                             -(_to_int(r.get("participations_total")) or 0)))
 
     with longlist_path.open("w", encoding="utf-8-sig", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=fields, quoting=csv.QUOTE_ALL)
+        w = csv.DictWriter(fh, fieldnames=fields, quoting=csv.QUOTE_ALL,
+                           extrasaction="ignore")
         w.writeheader()
         w.writerows(rows)
-    return longlist_path, hits, len(records)
+
+    return {
+        "pfad": longlist_path,
+        "zeilen": len(rows),
+        "angereicherte_saetze": len(records),
+        "stats": dict(stats),
+        "tier_vorher": dict(sorted(before.items())),
+        "tier_nachher": dict(sorted(Counter(r["tier"] for r in rows).items())),
+        "final": sum(1 for r in rows if r["tier_status"] == "final"),
+    }
