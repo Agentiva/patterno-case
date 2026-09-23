@@ -23,6 +23,9 @@ from src.resolve.normalize import (
     check_exclusion, needs_review, normalize_company,
     resolution_confidence, split_consortium,
 )
+from src.longlist.build import (
+    capture_recapture, companies_from_awards, export as export_longlist, summary,
+)
 from src.score.scoring import build_why_now, score_account
 from src.sources.ba_jobs import BAJobsSource
 from src.sources.dovs import VergabeSource
@@ -218,6 +221,41 @@ def cmd_runlog(_: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_longlist(args: argparse.Namespace) -> int:
+    from src.config import CPV_IT_PREFIXES
+    from src.sources.dovs import VergabeSource
+
+    src = VergabeSource(months=args.months)
+    if args.live:
+        releases = []
+        cursor = date.today()
+        from datetime import timedelta
+        for _ in range(args.months):
+            ym = cursor.strftime("%Y-%m")
+            try:
+                releases.extend(src._download_month(ym))
+                print(f"  . {ym}")
+            except Exception as exc:                       # noqa: BLE001
+                print(f"  ! {ym}: {exc}")
+            cursor = cursor.replace(day=1) - timedelta(days=1)
+        src.save_fixture(releases)
+    else:
+        releases = src.load_fixture()
+
+    def cpv_ok(codes):
+        return any(str(c).startswith(p) for c in codes for p in CPV_IT_PREFIXES)
+
+    index = companies_from_awards(releases, cpv_ok)
+    path = export_longlist(index)
+    s = summary(index)
+    print(f"\n{path}: {s['firmen_gesamt']} Firmen")
+    print(f"  Tiers: {s['tiers']}")
+    print(f"  nur als Konsortialmitglied gesehen: {s['nur_als_konsortialmitglied']}")
+    print(f"  mit Mehrfachzuschlag: {s['mit_mehrfachzuschlag']}")
+    print(f"  ohne Domain (Resolution offen): {s['ohne_domain']}")
+    return 0
+
+
 def main() -> int:
     p = argparse.ArgumentParser(prog="patterno-signals")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -230,6 +268,11 @@ def main() -> int:
     e = sub.add_parser("export", help="CSV schreiben")
     e.add_argument("--days", type=int, default=56, help="Signalfenster (Default 56 = 8 Wochen)")
     e.set_defaults(func=cmd_export)
+
+    ll = sub.add_parser("longlist", help="Aufgabe 1: Markt-Longlist aus Vergabedaten")
+    ll.add_argument("--live", action="store_true")
+    ll.add_argument("--months", type=int, default=36)
+    ll.set_defaults(func=cmd_longlist)
 
     lg = sub.add_parser("runlog", help="Laufprotokoll")
     lg.set_defaults(func=cmd_runlog)
