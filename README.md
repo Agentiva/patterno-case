@@ -273,5 +273,6 @@ in die Review-Queue fällt und Menschenzeit kostet.
 | `data/job_signale_ohne_icp_beleg.csv` | Prüfbestand, **kein Outbound** |
 | `docs/waterfalls.md` | Enrichment-Waterfalls mit gemessenen Quoten |
 | `docs/apollo_filter.md` | Apollo-Filter für Clay, aus echten Titeln |
+| `docs/playbook_it_systemhaeuser.md` | ICP-Playbook für beide Use Cases, im Format des Patterno-Playbooks |
 | `docs/tiering.md` | warum Tiering ein eigener Schritt ist, Konzernfalle |
 | `docs/betriebsmodell.md` | Clay / Supabase / Attio, Kosten je Lead |
