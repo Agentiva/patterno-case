@@ -34,6 +34,7 @@ from typing import Any, Iterable
 import requests
 
 from src.resolve.cpv import classify
+from src.sources.eforms import fristen
 from src.resolve.normalize import normalize_company
 from src.resolve.parties import bidder_parties, winner_keys
 from src.sources.base import FixtureMixin
@@ -90,6 +91,8 @@ class VergabeSource(FixtureMixin):
 
     def __init__(self, months: int = 3):
         self.months = months
+        # Wird in fetch() gefuellt, bevor Signale entstehen.
+        self._fristen: dict = {}
 
     # -- Abruf ----------------------------------------------------------------
     def _download_month(self, ym: str) -> list[dict]:
@@ -136,6 +139,22 @@ class VergabeSource(FixtureMixin):
             releases = self.load_fixture()
 
         today = date.today()
+
+        # Angebotsfristen nachladen, bevor die Signale entstehen. Nur fuer
+        # Verfahren, die ueberhaupt noch offen sein koennen: ohne Zuschlag,
+        # als Ausschreibung getaggt, und jung genug, dass die Frist im
+        # Nachfassfenster liegen kann. Ohne diese Eingrenzung waeren es
+        # 1.568 XML-Abrufe statt einiger hundert.
+        aelteste = today - timedelta(days=DEADLINE_MAX_DAYS + 30)
+        kandidaten = [
+            rel.get("id") for rel in releases
+            if rel.get("id") and not rel.get("awards")
+            and "tender" in (rel.get("tag") or [])
+            and not ((rel.get("tender") or {}).get("tenderPeriod") or {}).get("endDate")
+            and (rel.get("date") or "")[:10] >= aelteste.isoformat()
+        ]
+        self._fristen = fristen(kandidaten, live=live) if kandidaten else {}
+
         for rel in releases:
             yield from self._releases_to_signals(rel, since, today)
 
@@ -321,7 +340,14 @@ class VergabeSource(FixtureMixin):
         # Hier ist der Adressat NICHT der Bieter, sondern ein Account aus
         # Longlist 1, dessen CPV-/Regionsprofil passt. Das Matching passiert
         # im Scoring, nicht hier - deshalb org_name_raw = Vergabestelle.
+        # Die Frist steht NICHT im OCDS-JSON, sondern nur im eForms-XML
+        # (BT-131, cac:TenderSubmissionDeadlinePeriod). Deshalb hat dieser
+        # Signaltyp wochenlang geschwiegen. self._fristen ist der Cache,
+        # den fetch() vorher gefuellt hat - siehe src/sources/eforms.py.
         deadline = _iso((tender.get("tenderPeriod") or {}).get("endDate"))
+        if not deadline:
+            aus_xml = (self._fristen or {}).get(notice_id) or {}
+            deadline = aus_xml.get("deadline")
         if deadline and not rel.get("awards"):
             try:
                 days_left = (date.fromisoformat(deadline) - today).days
