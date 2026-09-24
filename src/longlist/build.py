@@ -432,40 +432,20 @@ def companies_from_awards(releases: Iterable[dict], cpv_ok) -> dict[str, Company
 
 
 # --- Vollstaendigkeit ---------------------------------------------------------
-def capture_recapture(n1: int, n2: int, overlap: int) -> dict:
-    """Chapman-Schaetzer fuer die Marktgroesse.
-
-        N = ((n1+1)(n2+1) / (m+1)) - 1
-
-    n1 = Firmen aus Quelle 1 (Vergabedaten)
-    n2 = Firmen aus Quelle 2 (Verzeichnis/Ranking)
-    m  = Ueberschneidung
-
-    WICHTIGER VORBEHALT - gehoert so ins README:
-    Der Schaetzer setzt voraus, dass beide Quellen UNABHAENGIG sind. Das sind
-    sie hier nicht: Vergabedaten und Branchenrankings ueberrepraesentieren
-    beide grosse Unternehmen. Die Ueberschneidung ist dadurch kuenstlich hoch
-    und N systematisch ZU NIEDRIG geschaetzt. Die reale Marktgroesse liegt
-    eher am oberen Rand des Intervalls, der Longtail kleiner Systemhaeuser
-    ist unterrepraesentiert.
-    """
-    if overlap <= 0:
-        return {"estimate": None, "note": "keine Ueberschneidung - nicht schaetzbar"}
-
-    n_hat = ((n1 + 1) * (n2 + 1) / (overlap + 1)) - 1
-    var = ((n1 + 1) * (n2 + 1) * (n1 - overlap) * (n2 - overlap)
-           / ((overlap + 1) ** 2 * (overlap + 2)))
-    se = math.sqrt(var) if var > 0 else 0.0
-    return {
-        "estimate": round(n_hat),
-        "ci95_low": round(max(n_hat - 1.96 * se, max(n1, n2))),
-        "ci95_high": round(n_hat + 1.96 * se),
-        "n1_vergabedaten": n1, "n2_verzeichnis": n2, "overlap": overlap,
-        "coverage_quelle1": round(n1 / n_hat, 3) if n_hat else None,
-        "vorbehalt": ("Unabhaengigkeitsannahme verletzt: beide Quellen "
-                      "ueberrepraesentieren grosse Unternehmen. N ist damit "
-                      "eher eine Untergrenze."),
-    }
+# Hier stand ein Chapman-Schaetzer (capture_recapture) fuer die Marktgroesse.
+# Er war nie aufgerufen - und das README behauptete trotzdem, er schaetze die
+# Abdeckung. Eine Funktion, die niemand ruft, ist kein Feature, sondern eine
+# Zusage ohne Deckung; dieselbe Fehlerklasse wie der nie feuernde Signaltyp
+# und das tote enrich_merge-Modul.
+#
+# Ehrlich ist: Fuer eine belastbare Schaetzung fehlt die zweite, UNABHAENGIGE
+# Quelle. Vergabedaten und Branchenrankings ueberrepraesentieren beide grosse
+# Unternehmen, die Unabhaengigkeitsannahme des Schaetzers waere verletzt und
+# das Ergebnis systematisch zu niedrig.
+#
+# Deshalb ist die Vollstaendigkeitsmessung Teil des Zwei-Wochen-Plans
+# (Eval-Harness mit gelabeltem Ground-Truth-Set), nicht eine Zahl, die hier
+# ohne Grundlage entsteht. Siehe README.
 
 
 # --- Export -------------------------------------------------------------------

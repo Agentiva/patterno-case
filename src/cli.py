@@ -24,7 +24,7 @@ from src.resolve.normalize import (
     resolution_confidence, split_consortium,
 )
 from src.longlist.build import (
-    capture_recapture, companies_from_awards, export as export_longlist, summary,
+    companies_from_awards, export as export_longlist, summary,
 )
 from src.score.scoring import build_why_now, score_account
 from src.sources.ba_jobs import BAJobsSource
