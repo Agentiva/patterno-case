@@ -140,11 +140,18 @@ class VergabeSource(FixtureMixin):
 
         today = date.today()
 
-        # Angebotsfristen nachladen, bevor die Signale entstehen. Nur fuer
-        # Verfahren, die ueberhaupt noch offen sein koennen: ohne Zuschlag,
-        # als Ausschreibung getaggt, und jung genug, dass die Frist im
-        # Nachfassfenster liegen kann. Ohne diese Eingrenzung waeren es
-        # 1.568 XML-Abrufe statt einiger hundert.
+        # Angebotsfristen nachladen, bevor die Signale entstehen.
+        #
+        # ACHTUNG, hier lag ein teurer Fehler: Die erste Fassung filterte
+        # nur nach "offen und jung genug" - aber ueber ALLE Releases, nicht
+        # nur die IT-relevanten. Die CPV-Pruefung passiert erst weiter
+        # unten in _releases_to_signals.
+        # Gemessen: 1.695 IT-Kandidaten gegenueber rund 28.250 ohne
+        # CPV-Filter, also Faktor 17. Der erste Live-Lauf lief dadurch in
+        # den 30-Minuten-Timeout, ohne eine einzige Frist zu speichern.
+        #
+        # Die Reihenfolge ist also nicht egal: erst fachlich eingrenzen,
+        # dann Netzwerk kosten verursachen.
         aelteste = today - timedelta(days=DEADLINE_MAX_DAYS + 30)
         kandidaten = [
             rel.get("id") for rel in releases
@@ -152,11 +159,38 @@ class VergabeSource(FixtureMixin):
             and "tender" in (rel.get("tag") or [])
             and not ((rel.get("tender") or {}).get("tenderPeriod") or {}).get("endDate")
             and (rel.get("date") or "")[:10] >= aelteste.isoformat()
+            and classify(rel.get("tender") or {})["is_it"]
         ]
         self._fristen = fristen(kandidaten, live=live) if kandidaten else {}
 
+        # === EINE ZEILE JE VERFAHREN, NICHT JE BEKANNTMACHUNG ===
+        # Ein Vergabeverfahren (ocid) kann mehrere Bekanntmachungen haben -
+        # typisch eine Korrektur einen Tag nach dem Original. Beide tragen
+        # dieselbe external_id, aber verschiedene notice_id, also
+        # verschiedene content_hashes.
+        #
+        # Ungefiltert ueberschreiben sie sich im selben Lauf gegenseitig,
+        # und der Store meldet sie JEDE WOCHE als "geaendert", obwohl sich
+        # nichts geaendert hat. Gemessen: 17 Schluessel, die bei vier
+        # Laeufen hintereinander konstant 25 Aenderungen erzeugten.
+        #
+        # Das ist keine Kleinigkeit: Der Delta-Ausgabe soll man glauben
+        # koennen. Dauerhaftes Rauschen zerstoert genau das.
+        #
+        # Gewollt ist die juengste Bekanntmachung je Verfahren. Der
+        # Gleichstand wird ueber die notice_id aufgeloest, damit das
+        # Ergebnis nicht von der Lesereihenfolge abhaengt.
+        neueste: dict[str, RawSignal] = {}
         for rel in releases:
-            yield from self._releases_to_signals(rel, since, today)
+            for sig in self._releases_to_signals(rel, since, today):
+                alt = neueste.get(sig.external_id)
+                if alt is None or self._rang(sig) > self._rang(alt):
+                    neueste[sig.external_id] = sig
+        yield from neueste.values()
+
+    @staticmethod
+    def _rang(sig: RawSignal) -> tuple[str, str]:
+        return (sig.event_date or "", str((sig.payload or {}).get("notice_id") or ""))
 
     # -- Fachlogik ------------------------------------------------------------
     def _releases_to_signals(
