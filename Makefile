@@ -1,4 +1,4 @@
-.PHONY: demo run export runlog reset retier package
+.PHONY: demo run export runlog reset retier package vk-audit
 
 demo:            ## Offline gegen Fixtures - fuer die Live-Demo
 	python3 -m src.cli run
@@ -18,6 +18,9 @@ retier:          ## Angereicherte Daten einspielen und neu einstufen
 
 package:         ## Abgabedateien + Stichproben-Audit bauen
 	python3 -m src.export.package
+
+vk-audit:        ## Quellenaudit fuer die vierte Signalquelle (Vergabekammer)
+	python3 -m src.sources.vergabekammer_audit
 
 runlog:
 	python3 -m src.cli runlog

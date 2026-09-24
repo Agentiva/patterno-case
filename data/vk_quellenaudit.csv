@@ -1,0 +1,6 @@
+﻿"kammer","verfahren_12m","url","such_url","http_start","http_suche","bytes","content_type","entscheidungslinks_gefunden","entscheidungen_geprueft","rollennennungen","davon_mit_firmierung","namensquote","aktenzeichen_erkannt","befund","urteil"
+"Vergabekammer des Bundes","2206","https://www.bundeskartellamt.de/DE/Vergaberecht/vergaberecht_node.html","https://www.bundeskartellamt.de/SiteGlobals/Forms/Suche/Entscheidungsdatenbanksuche_Formular.html?nn=299718&cl2Categories_Arbeitsbereich=vergaberecht&sortOrder=dateOfIssue_dt+desc&pageLocale=de","200","403","146","text/html","0","0","0","0","","0","HTTP 403 - Server blockt HTTP-Clients. Browser noetig (Playwright/Apify), kein Proxy-Problem.","browser_noetig"
+"Rechtsprechung im Internet (Bund)","0","https://www.rechtsprechung-im-internet.de","","200","","10332","text/html","0","0","0","0","","0","erreichbar","einstieg_unklar"
+"openJur","0","https://openjur.de","","200","","3651","text/html","0","0","0","0","","0","erreichbar","einstieg_unklar"
+"Landesrecht Baden-Wuerttemberg","409","https://www.landesrecht-bw.de","","200","","5269","text/html","0","0","0","0","","0","erreichbar","einstieg_unklar"
+"Vergabekammer NRW","593","https://www.vergabekammer.nrw.de","","0","","0","","0","0","0","0","","0","nicht erreichbar: ProxyError","einstieg_unklar"

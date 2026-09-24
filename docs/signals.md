@@ -21,16 +21,85 @@ offiziell freigegeben, ohne SLA. Im Lauf vom 23.09. lieferten 4 von N
 Abfragen HTTP 500. Sie trägt deshalb kein Signal allein, sondern nur in
 Kombination mit einem Vergabebeleg.
 
-### Die vierte Quelle fehlt
+### Die vierte Quelle: gemessen, noch nicht gebaut
 
 Der Case verlangt **≥ 4 wiederkehrende Quellen, davon ≥ 2 ohne
-Stellenanzeigen**. Die zweite Bedingung ist erfüllt (DÖE und TED). Die erste
+Stellenanzeigen**. Die zweite Bedingung ist erfüllt (DÖE und TED), die erste
 nicht: Es sind drei.
 
-Geplant und spezifiziert, aber nicht gebaut: **Vergabekammer-Entscheidungen**.
-Ein Nachprüfungsantrag ist der einzige öffentliche Beleg dafür, dass ein
-Unternehmen verloren hat *und* es ihm weh tut — genau die Lücke, die der
-Vergabefeed offenlässt (siehe unten). Das steht als Punkt im Zwei-Wochen-Plan.
+Die vierte wäre **Vergabekammer-Entscheidungen**. Ein Nachprüfungsantrag ist
+der einzige öffentliche Vorgang, bei dem ein Unternehmen *Geld dafür ausgibt*,
+zu zeigen, dass ihm eine verlorene Ausschreibung weh tut — Anwalt plus
+Kammergebühr. Genau die Lücke, die der Vergabefeed offenlässt.
+
+Statt sie zu bauen, wurde sie erst vermessen —
+`python3 -m src.sources.vergabekammer_audit`, Ergebnis in
+`data/vk_quellenaudit.csv`.
+
+**Befund 1 — welche Kammern überhaupt zählen.** Der OCDS-Feed nennt je
+Verfahren die zuständige Stelle (`parties[].roles = reviewBody`): 12.326
+Nennungen, 652 verschiedene Stellen, stark konzentriert.
+
+| Kammer | Verfahren / 12 Monate |
+|---|---|
+| Vergabekammer des Bundes *(3 Namensvarianten)* | ~2.206 |
+| VK Westfalen · VK Berlin · VK Hessen | 593 · 573 · 424 |
+| VK Baden-Württemberg · VK Niedersachsen · VK Rheinland | 409 · 355 · 329 |
+| VK Südbayern · 1. VK Sachsen | 324 · 313 |
+
+Es sind also nicht 652 Quellen zu bauen, sondern rund 15. Und der Feed sagt
+pro Verfahren vorher, welche Kammer zuständig ist — das ist der
+Routing-Schlüssel. Die drei Namensvarianten der Bundeskammer sind kein
+Schönheitsfehler: Ohne Normalisierung zählt man sie dreifach und priorisiert
+falsch.
+
+**Befund 2 — die Hauptquelle braucht einen Browser.** Gemessen am 24.09.2026:
+
+```
+bundeskartellamt.de, statische Seiten     HTTP 200, 148 KB
+bundeskartellamt.de, Entscheidungssuche   HTTP 403      ← WAF
+openjur.de · rechtsprechung-im-internet   HTTP 200
+vergabekammer.nrw.de                      nicht auflösbar
+```
+
+Der 403 kam vom Server, nicht vom Egress-Proxy — dessen Statusendpunkt
+meldete nur einen einzigen Relay-Fehler, und zwar für eine andere Domain. Der
+Such-Endpunkt blockt HTTP-Clients gezielt.
+
+Damit ist das **erste belastbare Argument für Apify** in diesem Projekt: Die
+drei bestehenden Quellen sind saubere HTTP-Aufrufe und brauchen keine
+Scraper-Plattform. Diese eine braucht einen echten Browser.
+
+**Befund 3 — die Frage, die alles entscheidet, ist noch offen.** Viele
+veröffentlichte Beschlüsse schreiben „die Antragstellerin" statt des
+Firmennamens. Ohne Namen kein Account, ohne Account kein Signal. Das Audit
+misst das mit `namensquote()`; die Schwelle steht bei **30 %**, unterhalb
+davon wird der Adapter nicht gebaut.
+
+Aktuell ist die Quote **nicht messbar**, weil an keiner Quelle ein Einstieg zu
+einzelnen Entscheidungen gefunden wurde — das Skript beendet sich deshalb mit
+Exit-Code 1. Die Messfunktion selbst ist getestet: 100 % auf fünf
+Namensvarianten (`Controlware GmbH`, `msg systems ag`, `adesso SE`,
+`SCALTEL GmbH & Co. KG`), 0 % auf anonymisiertem Text, keine Falsch-Positiven
+auf Fließtext.
+
+**Nächster Schritt:** 20 Entscheidungen von Hand ziehen, durch
+`namensquote()` schicken, und erst dann entscheiden.
+
+### Was ich stattdessen geprüft und verworfen habe
+
+Naheliegend wäre ein billiger Ersatz aus vorhandenen Daten:
+`award.status = "unsuccessful"` — Los oder Verfahren nicht vergeben, die
+Bieter haben umsonst kalkuliert. 469 Fälle in 12 Monaten.
+
+**Trägt nicht.** Von 72 Releases mit benannten Bietern sind 69 *gemischt*:
+Einige Lose vergeben, andere nicht. Und im Beispiel steht dieselbe Partei als
+`supplier` beim nicht vergebenen **und** beim vergebenen Los. Das Feld sagt
+also nicht „diese Firma hat verloren". Übrig bleiben 3 saubere Fälle im Jahr —
+das ist kein Signal, sondern Rauschen.
+
+Ein Signaltyp, der dreimal im Jahr feuert, sieht in der Konfiguration aus wie
+eine Quelle und ist keine.
 
 ## Signaltypen
 
