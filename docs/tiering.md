@@ -14,6 +14,10 @@ tier         B: 2.464   C: 4
 Enrichment, war beim Bau der Liste immer leer, also fiel jede Firma in
 denselben Zweig.
 
+*(Die Liste zählte damals 2.468 Firmen, heute 2.458 — dazwischen kamen die
+Personaldienstleister auf die Ausschlussliste. Die historischen Zahlen bleiben
+hier stehen, wie sie gemessen wurden.)*
+
 Der zweite Befund wog schwerer. Dort, wo die Zahl vorlag, war sie bei
 **5 von 10 Firmen die des Konzerns** statt die des bietenden Rechtsträgers:
 
@@ -52,11 +56,11 @@ kein Public-Sector-Beleg (P6)                     → D
 sonst                                             → C
 ```
 
-`tier_for()` in `src/longlist/build.py`. Ergebnis über 2.468 Firmen:
+`tier_for()` in `src/longlist/build.py`. Ergebnis über 2.458 Firmen:
 
 ```
-A   236   ( 10 %)   laufender Angebotsprozess
-B 1.268   ( 51 %)   wiederkehrender oder aktueller Bieter
+A   233   (  9 %)   laufender Angebotsprozess
+B 1.261   ( 51 %)   wiederkehrender oder aktueller Bieter
 C   964   ( 39 %)   Teilnahme belegt, weder häufig noch aktuell
 ```
 

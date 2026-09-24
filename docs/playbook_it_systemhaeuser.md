@@ -79,7 +79,7 @@ OCDS-Monatsexporte, CC0-lizenziert. Zeitraum 10/2025 – 09/2026:
 ```
 283.597   Bekanntmachungen gelesen
  17.185   mit IT-CPV-Dominanz (≥ 50 % der Lose IT)
-  2.468   Unternehmen mit belegter Teilnahme
+  2.458   Unternehmen mit belegter Teilnahme
   5.127   belegte Verfahrensteilnahmen insgesamt
 ```
 
@@ -238,7 +238,7 @@ Botschaft und unterschiedlichem Erfolgsmaßstab.
 | Kriterium | Use Case 1: Marktabdeckung | Use Case 2: Anlassbasiert |
 |---|---|---|
 | Datenquelle | `longlist_markt.csv` | `longlist_signale.csv` |
-| Umfang | 2.468 Unternehmen | 669 Accounts, 213 über Score-Schwelle |
+| Umfang | 2.458 Unternehmen | 651 Accounts, 200 über Score-Schwelle |
 | Rolle in der Kampagne | Basis — das gesamte adressierbare Universum | Spitze — wer diese Woche einen Grund hat |
 | Kadenz | einmalig aufgebaut, quartalsweise aktualisiert | wöchentlicher Lauf |
 | Aufhänger | belegte Teilnahmehistorie | konkretes Ereignis mit Datum |
@@ -264,7 +264,7 @@ Score-Schwelle.** Das ist die Liste, mit der eine Kampagne startet.
 
 ## 5. Use Case 1: Marktabdeckung — `longlist_markt.csv`
 
-**2.468 Unternehmen mit belegter Teilnahme an öffentlichen IT-Vergaben.**
+**2.458 Unternehmen mit belegter Teilnahme an öffentlichen IT-Vergaben.**
 
 ### Segmentbeschreibung
 
@@ -303,13 +303,13 @@ Projektleiter Öffentliche Auftraggeber
 
 Das Tier hängt **ausschließlich an Vergabedaten** — nicht an der
 Mitarbeiterzahl. Begründung in [`tiering.md`](tiering.md); kurz: Die Zahl fehlte
-bei allen 2.468 Zeilen und war dort, wo sie vorlag, bei 5 von 10 Firmen die des
+bei allen 2.458 Zeilen und war dort, wo sie vorlag, bei 5 von 10 Firmen die des
 Konzerns statt die des bietenden Rechtsträgers.
 
 | Tier | Regel | n | Ansprache |
 |---|---|---|---|
-| **A** | ≥ 3 Verfahren **und** Beleg ≤ 180 Tage | 236 | Welle 1 — laufender Angebotsprozess |
-| **B** | ≥ 2 Verfahren, oder 1 Verfahren mit frischem Beleg | 1.268 | Welle 2 — wiederkehrender Bieter |
+| **A** | ≥ 3 Verfahren **und** Beleg ≤ 180 Tage | 233 | Welle 1 — laufender Angebotsprozess |
+| **B** | ≥ 2 Verfahren, oder 1 Verfahren mit frischem Beleg | 1.261 | Welle 2 — wiederkehrender Bieter |
 | **C** | belegt, aber weder häufig noch aktuell | 964 | Nurture, kein aktives Outbound |
 
 Jede Zeile trägt die nachrechenbare Begründung:
@@ -477,7 +477,7 @@ Klammern sind Spaltennamen aus `longlist_markt.csv`.
 
 ## 6. Use Case 2: Anlassbasierte Ansprache — `longlist_signale.csv`
 
-**669 Accounts mit einem Ereignis aus den letzten acht Wochen, 213 über der
+**651 Accounts mit einem Ereignis aus den letzten acht Wochen, 200 über der
 Score-Schwelle.**
 
 ### Was der Use Case leistet
@@ -493,23 +493,36 @@ Das ist getestet, nicht behauptet.
 |---|---|---|---|
 | `rahmenvertrag_laeuft_aus` | 9 | 6 | Vertragsende in 180–270 Tagen — die Neuausschreibung kommt |
 | `angebot_ohne_zuschlag` | 8 | 0 | geboten, ein anderer bekam den Zuschlag (in 12 Monaten nur 1 Fall im Markt) |
+| `offene_ausschreibung_im_profil` | 8 | 0 | 196 laufende Verfahren mit Frist — nennen aber den Auftraggeber, nicht den Bieter (siehe unten) |
 | `bid_rolle_ausgeschrieben` | 7 | 1 | Stellenanzeige für Bid-/Tender-Rolle = akuter Kapazitätsschmerz |
-| `zuschlag_gewonnen` | 6 | 651 | frischer Zuschlag — im selben CPV-Segment laufen weitere Verfahren |
-| `teilnahme_belegt` | 5 | 11 | Bieter benannt, Ausgang nicht ableitbar |
+| `zuschlag_gewonnen` | 6 | 634 | frischer Zuschlag — im selben CPV-Segment laufen weitere Verfahren |
+| `teilnahme_belegt` | 5 | 10 | Bieter benannt, Ausgang nicht ableitbar |
 
 \* Accounts, bei denen dieses Signal den Score **treibt**. Ein Account kann
 mehrere Signaltypen tragen; der Stacking-Bonus greift ab zwei verschiedenen.
-128 der 669 Accounts tragen mehr als einen Signaltyp.
+124 der 651 Accounts tragen mehr als einen Signaltyp.
 
 **Warum die Stellenanzeige so selten zählt:** In acht Wochen erschienen
 bundesweit 79 Anzeigen für Bid-, Tender- und Angebotsrollen — quer über alle
 Branchen. Nach dem Abgleich gegen die Vergabedaten blieben **2 mit
-IT-Vergabebeleg**; 36 wanderten in den Prüfbestand
+IT-Vergabebeleg**; 35 wanderten in den Prüfbestand
 (`job_signale_ohne_icp_beleg.csv`). Eine Stellenanzeige belegt einen
 Kapazitätsschmerz, aber kein IT-Systemhaus: Ohne Branchenfilter finden sich
 darunter Bauunternehmen, Versorger (auf der Auftraggeberseite!) und Biotech.
 Der Signaltyp taugt deshalb als Einzelanlass, nicht als Marktargument — und
 er zählt nur für Firmen, die über die Vergabedaten bereits als IT belegt sind.
+
+**Die 196 offenen Verfahren sind ein Rohstoff, kein Anlass.** Die Angebotsfrist
+laufender Ausschreibungen steht nicht im OCDS-JSON, sondern erst im eForms-XML
+(BT-131). Sie wird jetzt gelesen und liegt in `offene_verfahren.csv` — aber eine
+laufende Ausschreibung nennt den **Auftraggeber**, nicht den Bieter. Wer sich
+bewerben wird, steht erst nach der Frist in den Daten. Nutzbar wird das erst
+über die Verbindung zu Use Case 1: *„Die Uni Jena schreibt eine
+I-Doit-Verlängerung aus, Frist in 13 Tagen — und Sie haben bei genau dieser
+Vergabestelle schon zweimal geboten."* Dieser Join ist billig, aber bewusst
+nicht gebaut: Er erzeugt eine Ansprache zu einem Verfahren, an dem das
+Unternehmen noch gar nicht teilnimmt. Ob das hilfreich wirkt oder übergriffig,
+ist eine Produktentscheidung.
 
 **Der wertvollste ist der seltenste.** `rahmenvertrag_laeuft_aus` ist datiert,
 öffentlich belegbar und in keinem Standard-Sales-Tool enthalten — er entsteht
@@ -525,8 +538,9 @@ ein starkes Signal auf einem Account mit wackliger Firmenzuordnung rutscht
 nicht nach oben.
 
 Die Enrichment-Schwelle liegt bei **40** und ist an der gemessenen Verteilung
-kalibriert, nicht geraten: 213 von 669 Accounts (29 %) liegen darüber, im
-Zielkorridor von 20–30 %. Die vollständige Score-Zerlegung je Account steht in
+kalibriert, nicht geraten: 200 von 651 Accounts (31 %) liegen darüber, knapp
+über dem Zielkorridor von 20–30 %. Maßgeblich war die Klippe zwischen 40 und
+45 (200 → 77), nicht die runde Zahl. Die vollständige Score-Zerlegung je Account steht in
 `score_trace.csv`.
 
 ### Die Top-Accounts mit „Why now"
@@ -684,7 +698,7 @@ Firmennamen durch den eines Wettbewerbers. Bleibt der Satz wahr, ist er nicht
 personalisiert.
 
 > **Nicht personalisiert:** „Ich habe gesehen, dass Sie IT-Dienstleistungen für
-> die öffentliche Hand erbringen." — trifft auf 2.468 Unternehmen zu.
+> die öffentliche Hand erbringen." — trifft auf 2.458 Unternehmen zu.
 >
 > **Personalisiert:** „Ihr Rahmenvertrag ‚Dienstleistung Infrastruktur
 > Netzwerk-Firewall' mit dem Universitätsklinikum Düsseldorf endet am
@@ -788,12 +802,12 @@ Vollständige Titellisten, Firmenfilter und die Clay-Reihenfolge in
 
 ## 12. Hinweise zur Nutzung
 
-- **Welle 1 sind 81 Accounts** — Tier A **und** Score ≥ 40. Nicht mit 2.468
+- **Welle 1 sind 77 Accounts** — Tier A **und** Score ≥ 40. Nicht mit 2.458
   starten; die Listenbreite ist Reserve, keine Kampagne.
 - **Erst scoren, dann anreichern.** Signale kosten nichts, Kontaktdaten schon.
   Personensuche nur für Accounts über der Score-Schwelle — rund **6,3
   Apollo-Credits je qualifiziertem Lead**, Rechnung in
-  [`betriebsmodell.md`](betriebsmodell.md).
+  [`operating_model.md`](operating_model.md).
 - **Beleg-URL vor Versand öffnen.** Bei `zuschlag_erschlossen` ist der Zuschlag
   abgeleitet. Ein falsch behaupteter Zuschlag kostet mehr Glaubwürdigkeit als
   zehn ungeöffnete Mails.
@@ -827,7 +841,7 @@ Veröffentlichungen, nicht aus Scraping.
 
 - **Systemhaus-Klassifikator** — CPV belegt Teilnahme, nicht Geschäftsmodell.
   Bis dahin Sichtprüfung je Account.
-- **Domain-Resolution** — von 2.468 Zeilen sind erst 11 angereichert; der Rest
+- **Domain-Resolution** — von 2.458 Zeilen sind erst 11 angereichert; der Rest
   läuft über Clay.
 - **Absender je Use Case festlegen** (Leon Brunner, Maurice Funk oder eine
   dedizierte Vertriebsrolle) inklusive Signatur.
@@ -844,8 +858,8 @@ Veröffentlichungen, nicht aus Scraping.
 
 | Datei | Inhalt | Stand |
 |---|---|---|
-| `data/longlist_markt.csv` | 2.468 Unternehmen mit Beleg, Tier und `proof_url` | 23.09.2026 |
-| `data/longlist_signale.csv` | 669 Accounts mit Score, Signaltyp und `why_now` | 23.09.2026 |
+| `data/longlist_markt.csv` | 2.458 Unternehmen mit Beleg, Tier und `proof_url` | 24.09.2026 |
+| `data/longlist_signale.csv` | 651 Accounts mit Score, Signaltyp und `why_now` | 24.09.2026 |
 | `data/score_trace.csv` | Score-Zerlegung je Account, Join über `company_id` | 23.09.2026 |
 | `data/offene_verfahren.csv` | Vergabestellen-Feed, Join-Input, **kein Outbound** | 23.09.2026 |
 | `data/job_signale_ohne_icp_beleg.csv` | Bid-Rollen ohne IT-Vergabebeleg, **kein Outbound** | 23.09.2026 |

@@ -103,15 +103,37 @@ eine Quelle und ist keine.
 
 ## Signaltypen
 
-| Signal | Gewicht | Quelle | Treiber-Accounts |
-|---|---|---|---|
-| `nachpruefung_vergabekammer` | 10 | — nicht implementiert | 0 |
-| `rahmenvertrag_laeuft_aus` | 9 | DÖE, Lot-`contractPeriod` | 6 |
-| `angebot_ohne_zuschlag` | 8 | DÖE, Bieter neben fremdem Gewinner | 1 |
-| `offene_ausschreibung_im_profil` | 8 | — Feld fehlt im OCDS-Mapping | 0 |
-| `bid_rolle_ausgeschrieben` | 7 | BA-Jobsuche | 1 |
-| `zuschlag_gewonnen` | 6 | DÖE + TED | 651 |
-| `teilnahme_belegt` | 5 | DÖE, Ausgang offen | 11 |
+| Signal | Gewicht | Quelle | Im Store | Treiber-Accounts |
+|---|---|---|---|---|
+| `nachpruefung_vergabekammer` | 10 | — nicht implementiert | 0 | 0 |
+| `rahmenvertrag_laeuft_aus` | 9 | DÖE, Lot-`contractPeriod` | 6 | 6 |
+| `angebot_ohne_zuschlag` | 8 | DÖE, Bieter neben fremdem Gewinner | 0 | 0 |
+| `offene_ausschreibung_im_profil` | 8 | DÖE, eForms-XML BT-131 | 196 | **0 — siehe unten** |
+| `bid_rolle_ausgeschrieben` | 7 | BA-Jobsuche | 79 | 1 |
+| `zuschlag_gewonnen` | 6 | DÖE + TED | 1.424 | 634 |
+| `teilnahme_belegt` | 5 | DÖE, Ausgang offen | 145 | 10 |
+| `leitungswechsel_public` | 5 | — keine Quelle angebunden | 0 | 0 |
+| `neue_public_referenz` | 4 | — keine Quelle angebunden | 0 | 0 |
+
+Die beiden Zahlenspalten laufen bewusst auseinander. **Im Store** ist, was nach
+der Delta-Erkennung persistiert wurde; **Treiber-Accounts** ist, wie oft der Typ
+das höchstbewertete Signal eines Accounts in `longlist_signale.csv` stellt.
+Dazwischen liegen Firmenauflösung, Ausschlusslisten und Confidence-Schwelle.
+Bei `bid_rolle_ausgeschrieben` ist der Trichter am steilsten: 79 Anzeigen für
+Bid- und Tenderrollen, davon **2 mit IT-Vergabebeleg**, davon **1** als
+Top-Signal seines Accounts. 35 der übrigen liegen als Prüfbestand in
+`job_signale_ohne_icp_beleg.csv` — eine Stellenanzeige belegt einen
+Kapazitätsschmerz, aber kein IT-Systemhaus.
+
+**`angebot_ohne_zuschlag` steht bei null, obwohl der Lauf ein Rohsignal
+erzeugt.** Die drei Bieter-Typen teilen sich den Schlüssel
+`{ocid}:bidder:{firma}`, weil sie dieselbe Tatsache beschreiben — diese Firma
+hat an diesem Verfahren teilgenommen — und sich nur im Ausgang unterscheiden.
+Trägt eine spätere Bekanntmachung zum selben Verfahren einen anderen Ausgang,
+gewinnt sie. Das ist gewollt: Die jüngste Bekanntmachung ist die richtige. Es
+heißt aber auch, dass dieser Typ nur überlebt, wenn er die letzte Aussage zum
+Verfahren ist — und das ist er in diesen zwölf Monaten kein einziges Mal. Die
+Begründung dafür steht unter „Was die Daten nicht hergeben".
 
 **Jeder Lauf listet auf, welcher Typ gefeuert hat und welcher nicht.** Das ist
 kein Komfort, sondern eine Lehre: `rahmenvertrag_laeuft_aus` las monatelang
@@ -120,9 +142,32 @@ keine Fehlermeldung. Ein leeres Signal sieht in jeder Statistik aus wie „diese
 Woche kein Anlass". Das Vertragsende hängt am Los: `tender.lots[].contractPeriod`,
 15.716 Treffer in 20.000 Releases.
 
-`offene_ausschreibung_im_profil` feuert bis heute nicht: Das OCDS-Mapping des
-Feeds führt weder `tenderPeriod` noch eine Angebotsfrist auf laufenden
-Verfahren. Die Frist steht im eForms-XML (BT-131), nicht im JSON.
+### `offene_ausschreibung_im_profil` — feuert, aber nicht auf Accounts
+
+Dieser Typ schwieg lange aus demselben Grund: Das OCDS-Mapping des Feeds führt
+auf laufenden Verfahren **weder `tenderPeriod` noch sonst eine Angebotsfrist**.
+Zweimal wurde daraus der falsche Schluss gezogen, der Feed kenne keine Frist.
+
+Er kennt sie — nur nicht im JSON. Dieselbe Bekanntmachung als XML abgerufen
+trägt `cac:TenderSubmissionDeadlinePeriod`, das ist BT-131 aus eForms-DE. Die
+URL dafür baute der Adapter schon lange; sie wurde nur nie gelesen
+(`src/sources/eforms.py`). **196 offene Verfahren** stehen jetzt in
+`data/offene_verfahren.csv`, Trefferquote des XML-Abrufs 60 %.
+
+Und trotzdem steht in der Tabelle oben eine Null bei den Treiber-Accounts. Das
+ist kein Restfehler, sondern die Natur des Signals: Eine laufende Ausschreibung
+nennt **den Auftraggeber, nicht den Bieter**. Wer sich bewerben wird, steht erst
+nach der Frist in den Daten. Die Datei ist deshalb ausdrücklich als
+*Join-Input, kein Outbound* beschriftet.
+
+Nutzbar wird sie über die Verbindung zu Longlist 1: „Die Uni Jena schreibt eine
+I-Doit-Verlängerung aus, Frist in 13 Tagen — und Firma X hat bei genau dieser
+Vergabestelle schon zweimal geboten." **Diesen Join habe ich nicht gebaut.** Er
+ist billig (beide Seiten liegen als CSV vor, Schlüssel ist die Vergabestelle
+plus CPV-Präfix), aber er ist eine Produktentscheidung: Er erzeugt eine Ansprache
+zu einem Verfahren, an dem das Unternehmen noch gar nicht teilnimmt. Ob das
+hilfreich wirkt oder übergriffig, entscheidet man nicht im Code. Der Rohstoff
+liegt bereit, die Kopplung gehört in den Zwei-Wochen-Plan.
 
 ## Delta-Erkennung
 
@@ -141,11 +186,34 @@ nachträglich. Ohne Überlappung würde eine Korrektur nie gelesen.
 Nachgewiesen am Live-Lauf:
 
 ```
-Lauf 1 (leerer Store)   neu 1.694   geändert  21   unverändert   1
-Lauf 2 (direkt danach)  neu     0   geändert   6   unverändert 395
+Lauf 1 (leerer Store)   neu 1.850   geändert   0   unverändert    0
+Lauf 2 (direkt danach)  neu     0   geändert   0   unverändert  544
+Lauf 3, Lauf 4          neu     0   geändert   0   unverändert  544
 ```
 
-Die 6 Änderungen sind echte Korrekturen im Überlappungsfenster.
+### Der Fehler, der sich hinter genau dieser Zahl versteckt hat
+
+In einer früheren Fassung stand hier „Lauf 2: 6 Änderungen — echte Korrekturen
+im Überlappungsfenster, genau dafür ist das Fenster da". Das war falsch, und es
+war die bequeme Erklärung.
+
+Die sechs Zeilen änderten sich in **jedem** Lauf, auf unveränderter Eingabe. Ein
+Vergabeverfahren kann mehrere Bekanntmachungen tragen, typisch eine Korrektur
+einen Tag nach dem Original. Beide erzeugten dieselbe `external_id`, aber
+verschiedene `content_hashes`, überschrieben sich innerhalb desselben Laufs und
+meldeten sich danach dauerhaft als „geändert". 17 Schlüssel, konstant 25 falsche
+Änderungen über vier Läufe hinweg.
+
+Eine Delta-Ausgabe, der man nicht glauben kann, ist wertlos — hier hätte sie
+jede Woche dieselben Firmen als frisch bewegt gemeldet. Jetzt gewinnt je
+`external_id` die jüngste Bekanntmachung, Gleichstand wird über die `notice_id`
+aufgelöst, damit das Ergebnis nicht von der Lesereihenfolge abhängt.
+
+Das Überlappungsfenster bleibt richtig, es hat hier nur den Fehler getarnt:
+Echte Korrekturen sind in diesem Korpus selten genug, dass sechs davon pro Lauf
+plausibel aussahen. Der Beleg dafür, dass das Fenster funktioniert, muss deshalb
+anders erbracht werden — nicht daran, dass sich etwas ändert, sondern daran,
+dass sich bei gleicher Eingabe **nichts** ändert.
 
 **Beobachtbarkeit:** Jede Quelle schreibt eine Zeile in `runs` mit
 gelesenen/neuen/geänderten Zeilen und Fehlertext — `python3 -m src.cli runlog`.
@@ -164,7 +232,7 @@ score = min(Gewicht × Aktualität × ICP-Fit × Confidence + Stacking, cap) / c
 - **Aktualität** in Stufen: ≤14 Tage 1,0 · ≤28 0,8 · ≤42 0,6 · ≤56 0,4, Boden 0,2
 - **ICP-Fit** aus dem Tier: A 1,0 · B 0,8 · C 0,6 · D 0,3
 - **Confidence** aus der Firmenauflösung
-- **Stacking** +2,0 ab zwei verschiedenen Signaltypen (128 von 669 Accounts)
+- **Stacking** +2,0 ab zwei verschiedenen Signaltypen (124 von 651 Accounts)
 
 `icp_fit` und `match_confidence` wirken auf **[0,40 … 1,00]** statt [0 … 1].
 Sonst löscht eine Confidence von 0,65 ein Signal der Stärke 10 faktisch aus,
@@ -176,12 +244,16 @@ Die vollständige Zerlegung je Account steht in `data/score_trace.csv`, Join
 **Schwelle 40**, kalibriert an der gemessenen Verteilung, nicht geraten:
 
 ```
-30 → 354 Accounts (55 %)     40 → 186 (29 %)  ← gewählt
-35 → 237 (37 %)              45 →  38 ( 6 %)
+30 → 372 Accounts (57 %)     40 → 200 (31 %)  ← gewählt
+35 → 261 (40 %)              45 →  77 (12 %)
 ```
 
 Ziel war 20–30 %: genug Volumen für eine Woche Outbound, ohne den Longtail
-mitzubezahlen.
+mitzubezahlen. Nach dem Dubletten-Fix liegt die Schwelle bei 31 % — knapp
+darüber, weil das Bereinigen die Verteilung leicht verschoben hat. Zwischen 40
+und 45 liegt weiterhin eine Klippe (200 → 77); dort endet die Gruppe mit
+mehreren oder höher gewichteten Signalen. Den Wert deshalb nicht nachjustiert:
+Die Klippe ist die inhaltliche Grenze, die 30 % waren nur der Zielkorridor.
 
 ## Was die Daten nicht hergeben
 

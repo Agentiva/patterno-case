@@ -144,7 +144,7 @@ Email, Sequenz):
 ```
 
 Damit zahlst du Anreicherungs-Credits nur für Accounts, die den Check
-bestanden haben. Bei 2.468 Zeilen ist das der Unterschied zwischen einem
+bestanden haben. Bei 2.458 Zeilen ist das der Unterschied zwischen einem
 vierstelligen und einem dreistelligen Credit-Verbrauch.
 
 **Reihenfolge nicht vertauschen.** Der Klassifikator läuft *vor* der
@@ -219,11 +219,11 @@ das bewusst — und wenn du Softwarehäuser mitnehmen willst, ändere die
 
 | | |
 |---|---|
-| Sculptor-Lauf je Zeile | 1 Credit, mehrere Seitenaufrufe |
-| Testsatz (20 Zeilen) | 20 Credits, ein paar Minuten |
-| Volllauf über Accounts mit Domain | so viele Credits wie Zeilen |
+| Sculptor-Lauf je Zeile | 3 Credits, mehrere Seitenaufrufe |
+| Testsatz (20 Zeilen) | 60 Credits, ein paar Minuten |
+| Volllauf über die 233 Tier-A-Accounts | ~700 Credits |
 
-**Nicht über alle 2.468 Zeilen laufen lassen.** Erst über die 235 Tier-A-
+**Nicht über alle 2.458 Zeilen laufen lassen.** Erst über die 233 Tier-A-
 Accounts, dann über Tier B. Tier C braucht den Check gar nicht, solange du
 dort kein Outbound fährst.
 
@@ -246,5 +246,5 @@ Unternehmen genau einmal — nicht bei jedem wöchentlichen Signal erneut.
   und geht ohnehin nicht ins Tier ein (siehe [tiering.md](tiering.md)).
 
 Der Klassifikator ersetzt die Sichtprüfung nicht vollständig. Er reduziert
-sie von 2.468 Zeilen auf die, bei denen er `nicht_pruefbar`, `konzern` oder
+sie von 2.458 Zeilen auf die, bei denen er `nicht_pruefbar`, `konzern` oder
 eine Konfidenz unter 0,7 meldet.

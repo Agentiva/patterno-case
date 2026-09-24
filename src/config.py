@@ -135,16 +135,27 @@ RESOLUTION_MIN_CONFIDENCE = 0.70
 
 # Enrichment kostet Geld, Signale nicht -> erst scoren, dann anreichern.
 #
-# KALIBRIERT, nicht geraten. Gemessen am Lauf vom 23.09.2026 ueber 648
+# KALIBRIERT, nicht geraten. Gemessen am Lauf vom 24.09.2026 ueber 651
 # Accounts mit Signal aus 8 Wochen:
-#     Schwelle 30 -> 354 Accounts (55 %)
-#     Schwelle 35 -> 237 Accounts (37 %)
-#     Schwelle 40 -> 186 Accounts (29 %)   <- gewaehlt
-#     Schwelle 45 ->  38 Accounts ( 6 %)
-#     Schwelle 50 ->  29 Accounts ( 4 %)
+#     Schwelle 30 -> 372 Accounts (57 %)
+#     Schwelle 35 -> 261 Accounts (40 %)
+#     Schwelle 40 -> 200 Accounts (31 %)   <- gewaehlt
+#     Schwelle 45 ->  77 Accounts (12 %)
+#     Schwelle 50 ->  53 Accounts ( 8 %)
 # Ziel war ein Korridor von 20-30 %: genug Volumen fuer eine Woche Outbound,
 # ohne den Longtail mitzubezahlen. Zwischen 40 und 45 liegt eine Klippe -
 # dort endet die Gruppe mit mehreren oder hoeher gewichteten Signalen.
+#
+# 31 % liegt knapp ueber dem Korridor. Nicht nachjustiert: Massgeblich ist die
+# Klippe (200 -> 77), nicht die runde Zahl. Wer hier auf 42 ginge, um exakt
+# 30 % zu treffen, wuerde die Verteilung an den Korridor anpassen statt
+# umgekehrt.
+#
+# Die Zahlen davor (354/237/186/38/29) stammten aus einem Lauf, in dem sich
+# Bekanntmachungen desselben Verfahrens gegenseitig ueberschrieben. Nach dem
+# Dubletten-Fix in sources/dovs.py ist die Verteilung eine andere - deshalb
+# neu gemessen statt fortgeschrieben.
+#
 # Der Wert gehoert nach jedem groesseren Quellen- oder Gewichtungswechsel
 # erneut gegen die Verteilung geprueft.
 ENRICH_SCORE_THRESHOLD = 40

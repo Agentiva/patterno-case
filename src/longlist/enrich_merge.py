@@ -6,7 +6,7 @@ ANSPRACHE braucht.
 
 Es entscheidet NICHT ueber das Tier. Das haengt ausschliesslich an
 Vergabedaten (siehe src/longlist/build.py, tier_for). Der Grund steht dort
-ausfuehrlich; kurz: Die Mitarbeiterzahl fehlte bei allen 2.468 Zeilen und
+ausfuehrlich; kurz: Die Mitarbeiterzahl fehlte bei allen 2.458 Zeilen und
 war dort, wo sie vorlag, bei 5 von 10 Firmen die des Konzerns statt die des
 bietenden Rechtstraegers.
 

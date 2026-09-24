@@ -13,23 +13,22 @@ make package                       # Abgabedateien + Stichproben-Audit
 
 ## Die Entscheidung, aus der alles folgt
 
-Die Liste entsteht nicht aus einem Firmenverzeichnis, das ich auf
-Public-Sector-Bezug filtere, sondern aus **Vergabedaten, die ich auf
-Systemhaus-Eignung filtere**. Verzeichnis-first liefert „könnte relevant
-sein". Vergabedaten-first liefert „hat am 15.09.2026 den Zuschlag bekommen,
-hier ist das PDF". Teilnahme ist ein Faktum, kein Attribut.
+Nicht ein Firmenverzeichnis auf Public-Sector-Bezug filtern, sondern
+**Vergabedaten auf Systemhaus-Eignung**. Verzeichnis-first liefert „könnte
+relevant sein". Vergabedaten-first liefert „hat am 15.09.2026 den Zuschlag
+bekommen, hier ist das PDF". Teilnahme ist ein Faktum, kein Attribut.
 
 ## Ergebnis
 
 12 Monate Datenservice Öffentlicher Einkauf (CC0): **283.597 Bekanntmachungen
-→ 17.185 mit IT-CPV-Dominanz → 2.468 Unternehmen mit Beleg.**
+→ 17.185 mit IT-CPV-Dominanz → 2.458 Unternehmen mit Beleg.**
 
 | | |
 |---|---|
-| **Tier** (nur aus Vergabedaten: Häufigkeit, Aktualität, Breite, Belegart) | A 235 · B 1.267 · C 966 |
-| **Signale** 8 Wochen, 3 Quellen | 653 Accounts, 202 über Schwelle 40 |
-| **Idempotenz** live | Lauf 1: 1.694 neu · Lauf 2: **0 neu** |
-| **Eigenes Audit** 30 Zufallszeilen | 25/25 prüfbare Belege erreichbar, 0 tot |
+| **Tier** (nur aus Vergabedaten: Häufigkeit, Aktualität, Breite, Belegart) | A 233 · B 1.261 · C 964 |
+| **Signale** 8 Wochen, 3 Quellen | 651 Accounts, 200 über Schwelle 40 |
+| **Idempotenz** live | Lauf 1: 1.850 neu · Läufe 2–4: **0 neu, 0 geändert** |
+| **Eigenes Audit** 30 Zufallszeilen | 24/24 prüfbare Belege erreichbar · 5× TED nicht prüfbar · 2 Zeilen ohne Longlist-Bezug |
 | **Kontakte** | 69 Personen an 30 Accounts, E-Mail-Status je Zeile mit Quelle |
 
 ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
@@ -41,10 +40,10 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
   Handwerkskammer-Rahmenvereinbarung jeden Werkzeuglieferanten in die Liste.
 - **Vier Belegarten statt einer.** In 4.309 Bekanntmachungen ohne
   Gewinnerangabe hat **3.987 mal genau ein Bieter** geboten — der hat gewonnen,
-  nur anders gemappt. Pauschal als „hat verloren" geführt wären das 1.727
-  erfundene Eigenschaften mit amtlicher URL daneben.
+  nur anders gemappt. Pauschal als „hat verloren" geführt: 1.727 erfundene
+  Eigenschaften mit amtlicher URL daneben.
 - **Getrennte Fehlerkübel.** Vergabestellen, Job-Signale ohne IT-Beleg und
-  unsichere Auflösungen (87) landen je in einer eigenen Datei — nie im Outbound.
+  unsichere Auflösungen (85) landen je in einer eigenen Datei — nie im Outbound.
 - **Jeder Lauf meldet, welcher Signaltyp nicht gefeuert hat.**
 
 ## Was nicht funktioniert
@@ -52,23 +51,25 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
 - **Unterlegene Bieter sind unsichtbar.** In 438 von 441 Fällen ist die
   Bieterliste die Gewinnerliste. Das Systemhaus, das zwölfmal bietet und nie
   gewinnt, steht einmal in zwölf Monaten drin.
-- **Drei Signalquellen statt der geforderten vier.**
-  Vergabekammer-Entscheidungen sind spezifiziert, nicht gebaut.
-- **Zwei Signaltypen feuern nicht:** `offene_ausschreibung_im_profil` (das
-  OCDS-Mapping führt keine Angebotsfrist) und `nachpruefung_vergabekammer`.
+- **Drei Signalquellen statt vier.** Vergabekammer-Entscheidungen sind
+  vermessen ([Audit](docs/signals.md),
+  [Prompt](docs/clay_claygent_vergabekammer.md)), nicht gebaut.
+- **`offene_ausschreibung_im_profil` feuert, liefert keine Accounts.** Die
+  Frist steht nicht im OCDS-JSON, sondern im eForms-XML (BT-131) — jetzt
+  gelesen, **196 offene Verfahren**. Nur nennt eine laufende Ausschreibung den
+  *Auftraggeber*, nicht den Bieter. Der Join gegen Longlist 1 fehlt.
 - **Kein Systemhaus-Klassifikator.** CPV belegt Teilnahme, nicht
   Geschäftsmodell: Von 20 Stichproben stehen 18 in Tier A, **6 davon gehören
   nicht ins ICP** (Siemens Gebäudeautomation, Sensorhersteller, ein
-  Personaldienstleister). Prompt steht in
-  [clay_sculptor_systemhaus.md](docs/clay_sculptor_systemhaus.md), gelaufen
-  ist er noch nicht.
+  Personaldienstleister). [Prompt](docs/clay_sculptor_systemhaus.md) steht,
+  gelaufen ist er nicht.
 - **Keine Vollständigkeitsschätzung.** Dafür fehlt eine zweite, *unabhängige*
   Quelle; Vergabedaten und Branchenrankings überrepräsentieren beide große
-  Firmen. Lieber keine Zahl als eine unbelastbare.
-- **TED-Belege maschinell nicht prüfbar** — HTTP 202 auf jede serverseitige
-  Anfrage. Der Prüfer weist sie als dritte Kategorie aus, nicht als „ok".
+  Firmen.
+- **TED-Belege maschinell nicht prüfbar** (HTTP 202). Der Prüfer weist sie als
+  dritte Kategorie aus, nicht als „ok".
 
-## Vier Fehler, die jeder erfolgreich aussah
+## Fünf Fehler, die jeder erfolgreich aussah
 
 1. **Beleg-URL erfunden.** `/ui/de/notice/<ocid>` ist eine SPA: HTTP 200 auf
    *jede* URL, dieselbe 1.309-Byte-Hülle, 404 erst im Browser. Ein
@@ -80,6 +81,11 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
 4. **Trefferquote ohne Stichprobenangabe ist wertlos.** Domain-Resolution maß
    77 % — an bekannten Marken. Im Longtail 8 von 12 falsch, darunter
    `eominnesota.org` für die EOMI AG aus Hamburg.
+5. **Das Delta log dauerhaft.** Korrekturbekanntmachungen desselben
+   Verfahrens teilten sich einen Schlüssel: 25 Zeilen galten in *jedem* Lauf
+   als „geändert". Hier stand dazu „echte Korrekturen im
+   Überlappungsfenster" — die Erklärung, die zur Zahl passte. Widerlegt von
+   vier identischen Läufen hintereinander.
 
 **Kosten:** Quellen 0 €, Anreicherung ≈ **6,3 Apollo-Credits je
 qualifiziertem Lead** ([operating_model.md](docs/operating_model.md)). Der
@@ -100,12 +106,11 @@ Fehlersuche an echten Daten 40 · Enrichment und Audit 30 · Doku 25 Minuten.
 
 ---
 
-**Abgabe** — `data/`: `longlist_markt.csv` (1c) · `enrichment_markt.csv` (1d,
-48 Kontakte/24 Accounts) · `longlist_signale.csv` (2c) ·
-`enrichment_signale.csv` (2d, 21/10) · `validation_sample.csv` (eigenes Audit)
-· `score_trace.csv`. Nicht fürs Outbound: `offene_verfahren.csv`,
-`job_signale_ohne_icp_beleg.csv`.
-**`docs/`**: [signals.md](docs/signals.md) (Quellen, Delta, Scoring) ·
+**Abgabe** — `data/`: `longlist_markt.csv` (1c) · `enrichment_markt.csv`
+(1d, 48/24) · `longlist_signale.csv` (2c) · `enrichment_signale.csv` (2d,
+21/10) · `validation_sample.csv` · `score_trace.csv`. Nicht fürs Outbound:
+`offene_verfahren.csv`, `job_signale_ohne_icp_beleg.csv`.
+**`docs/`**: [signals.md](docs/signals.md) ·
 [operating_model.md](docs/operating_model.md) ·
 [waterfalls.md](docs/waterfalls.md) · [tiering.md](docs/tiering.md) ·
 [apollo_filter.md](docs/apollo_filter.md) ·

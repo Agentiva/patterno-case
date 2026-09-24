@@ -319,6 +319,24 @@ def main() -> int:
     print(f"  Telefon: {sum(1 for r in s if r['telefon'])}/{len(s)}")
     print(f"validation_sample.csv   {len(v):>3} Zeilen, "
           f"{sum(1 for r in v if r['urteil'] == 'ok')} ohne Befund")
+
+    # Verwaiste Zeilen laut melden.
+    #
+    # Der Clay-Export ist ein STANDBILD: Er wurde gezogen, bevor SThree und
+    # die anderen Personaldienstleister auf die Ausschlussliste kamen. Die
+    # Longlist kennt sie seitdem nicht mehr, der Export schon.
+    #
+    # Solche Zeilen werden nicht stillschweigend geloescht - dann waere nicht
+    # nachvollziehbar, dass es sie gab - sondern mit
+    # in_longlist = "NEIN - nicht zuordenbar" mitgefuehrt. Ohne diese Meldung
+    # sieht man das aber nur, wenn die Stichprobe zufaellig darauf faellt.
+    verwaist = ([r for r in m if r["in_longlist"].startswith("NEIN")]
+                + [r for r in s if r["in_longlist_signale"].startswith("NEIN")])
+    if verwaist:
+        print(f"  ! {len(verwaist)} Kontakt(e) ohne Longlist-Bezug - "
+              f"nicht ansprechen:")
+        for r in verwaist:
+            print(f"      {r['firma']} ({r['email'] or 'ohne Mail'})")
     return 0
 
 

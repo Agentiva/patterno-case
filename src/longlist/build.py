@@ -210,8 +210,9 @@ def proof_for(company: Company, today: date) -> tuple[str, str | None, str | Non
 # Die erste Fassung stufte nach Mitarbeitenden ein (Zielkorridor 50-2.000).
 # Das klang vernuenftig und war in der Praxis unbrauchbar:
 #
-#   - Die Zahl fehlte bei 2.468 von 2.468 Zeilen, weil sie erst aus dem
-#     Enrichment kommt. Jede Firma fiel in denselben Zweig -> 2.464x Tier B.
+#   - Die Zahl fehlte bei jeder Zeile, weil sie erst aus dem Enrichment
+#     kommt. Jede Firma fiel in denselben Zweig -> 2.464 von 2.468x Tier B
+#     (die Liste zaehlte damals 2.468 Firmen, heute 2.458).
 #   - Wo sie vorlag, war sie bei 5 von 10 Firmen die des KONZERNS statt die
 #     des Rechtstraegers (Bechtle 17.000, Computacenter 21.000/UK).
 #
@@ -224,7 +225,7 @@ def proof_for(company: Company, today: date) -> tuple[str, str | None, str | Non
 #   Breite         Wie viele verschiedene Auftraggeber?    (626 Firmen > 1)
 #   Belegart       Zuschlag benannt, erschlossen, offen?
 #
-# Gemessen am 23.09.2026 ueber 2.468 Firmen: A 236, B 1.268, C 964.
+# Gemessen am 24.09.2026 ueber 2.458 Firmen: A 233, B 1.261, C 964.
 # Gegenprobe: Von den fuenf Firmen, die unabhaengig per Apollo als
 # ICP-passend bestaetigt wurden (63-900 MA), landen drei allein aus den
 # Vergabedaten in Tier A. Die Groesse korreliert also, ohne dass wir sie
