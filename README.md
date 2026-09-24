@@ -57,8 +57,11 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
 - **Zwei Signaltypen feuern nicht:** `offene_ausschreibung_im_profil` (das
   OCDS-Mapping führt keine Angebotsfrist) und `nachpruefung_vergabekammer`.
 - **Kein Systemhaus-Klassifikator.** CPV belegt Teilnahme, nicht
-  Geschäftsmodell — unter den Top-Signalen stehen Siemens (Gebäudeautomation)
-  und ein Sensorhersteller. Sichtprüfung vor Versand ist Pflicht.
+  Geschäftsmodell: Von 20 Stichproben stehen 18 in Tier A, **6 davon gehören
+  nicht ins ICP** (Siemens Gebäudeautomation, Sensorhersteller, ein
+  Personaldienstleister). Prompt steht in
+  [clay_sculptor_systemhaus.md](docs/clay_sculptor_systemhaus.md), gelaufen
+  ist er noch nicht.
 - **Keine Vollständigkeitsschätzung.** Dafür fehlt eine zweite, *unabhängige*
   Quelle; Vergabedaten und Branchenrankings überrepräsentieren beide große
   Firmen. Lieber keine Zahl als eine unbelastbare.
@@ -106,4 +109,5 @@ Fehlersuche an echten Daten 40 · Enrichment und Audit 30 · Doku 25 Minuten.
 [operating_model.md](docs/operating_model.md) ·
 [waterfalls.md](docs/waterfalls.md) · [tiering.md](docs/tiering.md) ·
 [apollo_filter.md](docs/apollo_filter.md) ·
+[clay_sculptor_systemhaus.md](docs/clay_sculptor_systemhaus.md) ·
 [playbook_it_systemhaeuser.md](docs/playbook_it_systemhaeuser.md).

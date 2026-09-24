@@ -61,7 +61,17 @@ COMPETITORS_AND_PORTALS = [
 # Reine Produkt-/Handels-/Personalunternehmen -> kein Systemhaus-Motion.
 NON_SYSTEMHAUS = [
     "cyberport", "notebooksbilliger", "alternate", "conrad electronic",
+    # Personaldienstleister im IT-Umfeld. Ihre Websites sind voller
+    # IT-Begriffe und sie gewinnen IT-Ausschreibungen - sie vermitteln aber
+    # Menschen, keine IT-Leistung. SThree (Marken u. a. Computer Futures)
+    # stand bis 24.09.2026 nicht hier und landete dadurch auf Platz 18 der
+    # Signalliste, in Tier A, mit 8 Verfahren.
+    # Eine Blacklist faengt solche Faelle immer erst NACH dem Schaden.
+    # Systematisch loest das der Sculptor-Klassifikator - siehe
+    # docs/clay_sculptor_systemhaus.md.
     "hays", "ferchau", "amadeus fire", "brunel", "gulp",
+    "sthree", "computer futures", "hueter", "randstad", "adecco",
+    "michael page", "robert half", "solcom", "etengo", "questax",
     "sap se", "software ag", "microsoft deutschland", "oracle deutschland",
 ]
 
