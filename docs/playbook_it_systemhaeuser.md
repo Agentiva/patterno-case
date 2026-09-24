@@ -119,25 +119,109 @@ Das hat zwei Konsequenzen für die Ansprache:
 
 ---
 
-## 3. Produkte und Wertversprechen für dieses Segment
+## 3. Produkte und Wertversprechen
 
-| Produkt | Nutzen für ein IT-Systemhaus |
+### Allgemeine Produktbeschreibung
+
+Patterno ist eine KI-Ausschreibungssoftware für Unternehmen, die sich an
+öffentlichen Ausschreibungen beteiligen. Die Plattform bündelt Ausschreibungen
+aus über 4.500 Vergabeportalen in 29 Ländern — darunter TED, DTVP, Vergabe24,
+Staatsanzeiger, eVergabe.de, Subreport ELViS und die Landesportale — und
+bewertet jede einzelne Ausschreibung per Qualifizierter KI-Suche im Volltext
+gegen das Profil des Kunden. Das Ergebnis ist eine tägliche Trefferliste mit
+wenigen, dafür passenden Verfahren. Für ein IT-Systemhaus heißt das: Statt
+Landesportale, Kommunalplattformen und TED einzeln zu sichten, liegt morgens
+eine Liste vor, die nach dem eigenen CPV-Profil, dem Einzugsgebiet und der
+Auftragsgröße gefiltert ist.
+
+Im zweiten Schritt liest die KI die Vergabeunterlagen: über 100 Seiten in rund
+30 Sekunden, mit automatischer Erkennung von Fristen, Auftragswert,
+Losstruktur, Eignungsanforderungen und K.-o.-Kriterien — jeder Befund verlinkt
+auf die Fundstelle im Originaldokument. Im dritten Schritt erstellt der AI Chat
+Angebotsunterlagen, Eigenerklärungen, Kalkulationstabellen und Begleitschreiben
+direkt aus Ausschreibungs- und Unternehmensdaten.
+
+Im IT-Segment trifft dieser Standard auf ein Vergabegeschehen, das sich
+über drei CPV-Säulen verteilt: **IT-Dienstleistungen** (CPV 72, 3.299
+Nennungen in zwölf Monaten), **Softwarepakete und Informationssysteme**
+(CPV 48, 1.494) und **Datenverarbeitungsgeräte** (CPV 30, 926), ergänzt um
+Telekommunikation (CPV 64) sowie Wartung und Installation (CPV 50/51). Die
+Verfahren tragen Titel wie „Softwareprogrammierung und -beratung —
+Framework-Vertrag", „Dienstleistungen im Sektor Informationssicherheit" oder
+„Rahmenvertrag Magnetbandkassetten" — also Beratung, Entwicklung,
+Infrastruktur und Betrieb in einem Segment, das fast durchgängig über
+Rahmenvereinbarungen und Mehrlosverfahren vergeben wird. Genau dort liegt der
+Nutzen der Dokumentenanalyse: Die Losstruktur entscheidet, ob ein Verfahren
+überhaupt zum eigenen Portfolio passt, und sie steht selten im Titel.
+
+Anders als für Pharma und Bau hat Patterno für die IT **keine
+Branchenspezialisierung** gebaut. Das bestehende Playbook benennt das in
+Kapitel 4 als Grund, das Segment zurückzustellen, und formuliert die
+Reaktivierungsbedingung: „Eine IT-Spezialisierung (z. B. EVB-IT-Logik) im
+Produkt existiert." Diese Lücke wird hier nicht kaschiert — sie ist aber auch
+nicht das entscheidende Verkaufsargument. Was die Standardfunktionen in
+IT-Vergabeunterlagen finden, ist fachlich anspruchsvoll genug: EVB-IT-Vertragstyp
+und -Anlagen, Eignungsnachweise wie BSI-Grundschutz, ISO 27001 oder BSI C5,
+Präqualifikation, Nachunternehmerregelungen, Service-Level und Vertragslaufzeiten
+samt Verlängerungsoptionen. Die Spezifität dieses Playbooks entsteht deshalb
+nicht aus einer Produktfunktion, sondern aus den Daten in der Ansprache
+(Kapitel 9).
+
+### Allgemeines Wertversprechen
+
+Patterno verwandelt einen fragmentierten, personalintensiven Suchprozess in
+einen automatisierten Entscheidungsprozess. Der Kunde sieht mehr vom Markt
+(Abdeckung), sieht ihn früher (tägliche Trefferliste), entscheidet schneller
+(Analyse in Sekunden statt Stunden) und bewirbt sich häufiger, ohne
+zusätzliches Personal einzustellen.
+
+Der wirtschaftliche Hebel liegt nicht im Software-Preis, sondern in der
+Kapazität: Jede Stunde, die heute in Portalsichtung und Unterlagenlesen
+fließt, ist eine Stunde, die nicht in Kalkulation, Preisstrategie und
+Angebotsqualität geht. Bei einem Angebotsaufwand von 16 bis 30 Stunden je
+Bewerbung amortisiert sich die Plattform bereits, wenn sie ein einziges
+aussichtsloses Verfahren frühzeitig aussortiert — oder ein passendes
+rechtzeitig sichtbar macht.
+
+Im IT-Segment kommt ein zweiter Hebel dazu, der in den Daten sichtbar ist:
+**Wiederholung.** 236 Unternehmen bestreiten drei oder mehr Verfahren pro Jahr,
+das aktivste 131 — verteilt auf bis zu 92 verschiedene Auftraggeber. Bei
+dieser Frequenz ist die Sichtung kein Nebenjob mehr, sondern eine Stelle.
+Qualifizierte Bid- und Angebotsmanager sind am Markt jedoch kaum verfügbar.
+Automatisierung ist deshalb nicht die günstigere Variante der Einstellung,
+sondern häufig die einzig verfügbare.
+
+### Produkt-Übersicht
+
+| Produkt / Funktion | Nutzen für ein IT-Systemhaus |
 |---|---|
-| **Patterno HIT** | Tägliche Trefferliste über 4.500 Portale, gefiltert nach CPV-Profil (48/72/302/5031/5032/5161/642), Region und Auftragswert |
-| **Patterno BID** | Vergabeunterlagen mit EVB-IT-Bezug, Eignungsnachweisen, BSI-Grundschutz- und ISO-27001-Anforderungen automatisch geprüft |
-| **AI Chat** | Eigenerklärungen, Referenzlisten und Angebotsunterlagen direkt aus den Vergabedaten |
+| **Patterno HIT** | Qualifizierte KI-Suche über 4.500+ Portale, gefiltert nach CPV-Profil (48/72/302/5031/5032/5161/642), Region und Auftragswert |
+| **Patterno BID** | Vergabeunterlagen geprüft auf EVB-IT-Bezug, Losstruktur, Eignungsnachweise, BSI-Grundschutz-, ISO-27001- und C5-Anforderungen |
+| **AI Chat** | Eigenerklärungen, Referenzlisten, Kalkulationstabellen und Begleitschreiben direkt aus den Vergabedaten |
+| **Dokumentenextraktion** | Vergabeunterlagen automatisch aus allen Portalen gezogen und strukturiert — ohne manuellen Download je Portal |
 | **Wettbewerbsansicht** | Wer hat im eigenen CPV-Segment und in der eigenen Region zuletzt den Zuschlag bekommen |
-| **Fristen-/Pipeline-Tracking** | Rahmenvertragsenden und Submissionstermine im Team statt in Einzel-Excels |
+| **Pipeline- und Fristen-Tracking** | Rahmenvertragsenden, Bieterfragenfristen und Submissionstermine im Team statt in Einzel-Excels |
+| **Tender Intelligence** | Vergabetrends und Preisentwicklung je CPV-Segment als Kalkulationsgrundlage |
+| **Sicherheit und Betrieb** | Deutsche Server (Frankfurt), DSGVO-konform, ISO-27001-Infrastruktur, SSO und AVV/NDA im Enterprise-Paket — im öffentlichen IT-Geschäft regelmäßig selbst Prüfkriterium |
 
-**Der wirtschaftliche Hebel** ist derselbe wie in den anderen beiden ICPs: nicht
-der Softwarepreis, sondern Kapazität. Wer keine Bid-Kapazität einstellen kann,
-muss automatisieren.
+### Orientierung: typische Investitionsrahmen
 
-*Zur Belastbarkeit dieser Aussage:* In acht Wochen erschienen bundesweit 79
-Stellenanzeigen für Bid-, Tender- und Angebotsrollen — quer über alle Branchen.
-Nach dem Abgleich gegen die Vergabedaten blieben davon **2 mit IT-Vergabebeleg**;
-36 wanderten in den Prüfbestand. Die Stellenanzeige taugt deshalb als
-Einzelanlass, nicht als Marktbeleg.
+| Paket | Rahmen (Richtwert) | Passung im Segment | Accounts |
+|---|---|---|---|
+| Starter | ab 89 € / Monat | ein Verfahren im Jahr, gelegentliche Teilnahme — meist Tier C | 1.768 |
+| Team | ab 269 € / Monat | 2 Verfahren, eigene Angebotsbearbeitung — Tier B/C | 361 |
+| Scale | ab 449 € / Monat | 3–20 Verfahren, mehrere Auftraggeberkreise — **Tier A/B** | 322 |
+| Enterprise | ab 2.249 € / Monat | über 20 Verfahren, Dauerbieter mit eigener Bid-Funktion — **Tier A** | 17 |
+
+Preise netto, bei jährlicher Vorauszahlung. Im Erstkontakt dienen die Zahlen
+als Gesprächsanker, nicht als Angebot — aktuelle Konditionen vor Nennung
+intern bestätigen.
+
+Die Zuordnung ist aus den Daten ableitbar: `participations_total` und
+`buyers_total` in `longlist_markt.csv` sagen, wie viele Verfahren und wie
+viele Auftraggeberkreise ein Unternehmen tatsächlich bedient. Ein Haus mit
+20 Verfahren bei 19 Auftraggebern (d.velop AG) gehört in ein anderes Gespräch
+als eines mit einem einzigen Verfahren.
 
 ---
 
@@ -415,6 +499,17 @@ Das ist getestet, nicht behauptet.
 
 \* Accounts, bei denen dieses Signal den Score **treibt**. Ein Account kann
 mehrere Signaltypen tragen; der Stacking-Bonus greift ab zwei verschiedenen.
+128 der 669 Accounts tragen mehr als einen Signaltyp.
+
+**Warum die Stellenanzeige so selten zählt:** In acht Wochen erschienen
+bundesweit 79 Anzeigen für Bid-, Tender- und Angebotsrollen — quer über alle
+Branchen. Nach dem Abgleich gegen die Vergabedaten blieben **2 mit
+IT-Vergabebeleg**; 36 wanderten in den Prüfbestand
+(`job_signale_ohne_icp_beleg.csv`). Eine Stellenanzeige belegt einen
+Kapazitätsschmerz, aber kein IT-Systemhaus: Ohne Branchenfilter finden sich
+darunter Bauunternehmen, Versorger (auf der Auftraggeberseite!) und Biotech.
+Der Signaltyp taugt deshalb als Einzelanlass, nicht als Marktargument — und
+er zählt nur für Firmen, die über die Vergabedaten bereits als IT belegt sind.
 
 **Der wertvollste ist der seltenste.** `rahmenvertrag_laeuft_aus` ist datiert,
 öffentlich belegbar und in keinem Standard-Sales-Tool enthalten — er entsteht
