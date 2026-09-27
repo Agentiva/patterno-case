@@ -9,6 +9,7 @@ make longlist                      # Aufgabe 1: 12 Monate Vergabedaten → Longl
 make run                           # Aufgabe 2: Signale gegen die echten APIs
 make demo                          # offline, 2× hintereinander = 0 neue Zeilen
 make domains                       # Domains aus der Quelle + Tiers nachziehen
+make clay-todo                     # offene Domains → Clay (Stufe 2)
 make vollstaendigkeit              # Fang-Wiederfang: wie viel fehlt?
 make package                       # Abgabedateien + Stichproben-Audit
 ```
@@ -47,8 +48,7 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
   nur anders gemappt. Pauschal „hat verloren": 1.727 erfundene Eigenschaften.
 - **Getrennte Fehlerkübel.** Vergabestellen, Job-Signale ohne IT-Beleg und
   unsichere Auflösungen (85) landen je in eigenen Dateien — nie im Outbound.
-  TED-Belege sind maschinell nicht prüfbar (HTTP 202) und werden als eigene
-  Kategorie geführt.
+  TED-Belege (HTTP 202) sind eine eigene Kategorie, kein „ok".
 - **Jeder Lauf meldet, welcher Signaltyp nicht gefeuert hat.**
 - **Domain aus derselben Bekanntmachung wie der Beleg.** eForms führt einen
   `contactPoint` je Bieterpartei: 75,3 % roh, ohne einen Credit. Nach der
@@ -72,8 +72,9 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
   ins ICP** (Siemens Gebäudeautomation, Sensorhersteller,
   Personaldienstleister). [Prompt](docs/clay_sculptor_systemhaus.md) steht,
   gelaufen ist er nicht.
-- **971 Firmen ohne Domain (39,5 %).** 631 davon führt die Quelle nicht, der
-  Rest ist bewusst offen gelassen statt geraten.
+- **971 Firmen ohne Domain (39,5 %).** Stufe 2 des Waterfalls (KI-Recherche
+  in Clay) ist gebaut, aber nicht gelaufen — `make clay-todo` erzeugt die
+  971 Zeilen ([Prompt](docs/clay_domain_waterfall.md)).
 - **Höchstens ein Drittel abgedeckt.** 73 % der Firmen tauchen in genau
   *einem* von zwölf Monaten auf — unterabgetastet. Daneben der größere blinde
   Fleck: ~90 % der öffentlichen Aufträge sind unterschwellig, im Korpus liegen
@@ -108,10 +109,12 @@ echten Daten 40 · Enrichment und Audit 30 · Doku 25 Minuten.
 **Abgabe** — `data/`: `longlist_markt.csv` (1c) · `enrichment_markt.csv` (1d)
 · `longlist_signale.csv` (2c) · `enrichment_signale.csv` (2d) ·
 `validation_sample.csv` · `score_trace.csv` · `domains_amtlich.csv` ·
-`vollstaendigkeit.csv`. Nicht fürs
+`vollstaendigkeit.csv` · `clay_domain_todo.csv`. Nicht fürs
 Outbound: `offene_verfahren.csv`, `job_signale_ohne_icp_beleg.csv`.
 **`docs/`** — [signals.md](docs/signals.md) ·
-[waterfalls.md](docs/waterfalls.md) · [tiering.md](docs/tiering.md) ·
+[waterfalls.md](docs/waterfalls.md) ·
+[clay_domain_waterfall.md](docs/clay_domain_waterfall.md) ·
+[tiering.md](docs/tiering.md) ·
 [vollstaendigkeit.md](docs/vollstaendigkeit.md) ·
 [operating_model.md](docs/operating_model.md) ·
 [apollo_filter.md](docs/apollo_filter.md) ·

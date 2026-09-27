@@ -87,19 +87,40 @@ SOURCE_RANK = {
     "amtlich_bestaetigt": 0.95,     # url und Mail der Bekanntmachung stimmen ueberein
     "amtlich_namensbezug": 0.90,    # eine amtliche Quelle, Domainstamm passt zum Namen
     "amtlich_unbestaetigt": 0.60,
-    "enrichment": 0.70,             # Clay/Apollo ohne eigene Konfidenzangabe
+    "enrichment": 0.70,             # Clay/Apollo, Anbieterdatenbank
+    # Stufe 2 des Waterfalls: KI-Recherche in Clay, nur fuer Zeilen OHNE
+    # Domain. Bewusst die schwaechste Quelle im Modell - sie leitet aus dem
+    # Firmennamen ab statt aus einem Register oder einer Bekanntmachung.
+    "clay_ai": 0.55,
 }
 DEFAULT_RANK = 0.70
 
 
 def _rank(source: str | None, confidence=None) -> float:
-    """Guete einer Domainangabe. Eine mitgelieferte Konfidenz gewinnt."""
+    """Guete einer Domainangabe: Quellendeckel, durch Konfidenz gesenkt.
+
+    === WARUM DIE KONFIDENZ NICHT EINFACH GEWINNT ===
+    Die erste Fassung nahm die mitgelieferte Konfidenz, wenn eine da war.
+    Das ist gefaehrlich, sobald ein LLM die Quelle ist: Ein Sprachmodell,
+    das "apple.com" aus "Apple" ableitet, meldet dafuer 0,95 - und wuerde
+    damit eine amtlich bestaetigte Domain ueberschreiben.
+
+    Gemessen ist genau dieser Fehlermodus: Die namensbasierte Aufloesung
+    lag im Longtail bei 8 von 12 Zeilen falsch, darunter eominnesota.org
+    fuer die EOMI AG aus Hamburg - mit voller Zuversicht geliefert.
+
+    Deshalb ist der Quellenrang eine OBERGRENZE. Eine Zeile kann durch ihre
+    Konfidenz schlechter werden als ihre Quelle, aber nie besser. Eine
+    KI-Vermutung bleibt unter jeder amtlichen Angabe, egal was sie ueber
+    sich selbst behauptet.
+    """
+    deckel = SOURCE_RANK.get((source or "").strip(), DEFAULT_RANK)
     try:
         if confidence not in (None, ""):
-            return float(confidence)
+            return min(float(confidence), deckel)
     except (TypeError, ValueError):
         pass
-    return SOURCE_RANK.get((source or "").strip(), DEFAULT_RANK)
+    return deckel
 
 
 def _norm_key(k: str) -> str:
@@ -194,6 +215,11 @@ def load_enrichment(path: Path) -> list[dict]:
             "industry": _pick(r, "industry"),
             "linkedin": _pick(r, "linkedin"),
             "domain_source": _pick(r, "domain_source"),
+            # Ohne diese Zeile kam die Konfidenz nie im Datensatz an: Der
+            # Alias war definiert, aber niemand las ihn. Die Rangregel fiel
+            # damit still auf den Quellendeckel zurueck - richtig, aber aus
+            # dem falschen Grund, und die Spalte blieb leer.
+            "domain_confidence": _pick(r, "domain_confidence"),
         })
     return out
 

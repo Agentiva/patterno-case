@@ -8,9 +8,33 @@ Alle Zahlen sind an echten Daten gemessen, Stand 27.09.2026. Keine Schaetzungen.
 |---|---|---|---|
 | **0** | **`contactPoint` der Bieterpartei in der Bekanntmachung selbst** | **0** | **1.487 von 2.458 (60,5 %)** |
 | 1 | Apollo Organizations Lookup, voller Name + Ortsfilter Deutschland | 0 | praezise, aber loechrig |
-| 2 | Apollo Lookup, verkuerzter Name, OHNE Ortsfilter | 0 | mehr Treffer, hohe Fehlerquote |
+| **2** | **KI-Recherche in Clay, nur fuer Zeilen ohne Domain** | **1–3 Credits/Zeile** | **971 offene Zeilen** — [clay_domain_waterfall.md](clay_domain_waterfall.md) |
 | 3 | Impressum abrufen (§ 5 DDG) und gegen Firmenname + Ort der Vergabe pruefen | 0 | harter Beleg |
 | 4 | Manuelle Review-Queue | Zeit | Rest |
+
+Die frueheren Stufen 1 und 2 (Apollo mit und ohne Ortsfilter) sind zu einer
+zusammengefasst. Die zweite — verkuerzter Name ohne Ortsfilter — war es, die
+im Longtail 8 von 12 Zeilen falsch aufloeste; sie steht unten als Messung,
+nicht mehr als Arbeitsschritt.
+
+### Stufe 2: der Rang macht sie ungefaehrlich
+
+```python
+SOURCE_RANK = {
+    "amtlich_bestaetigt":  0.95,
+    "amtlich_namensbezug": 0.90,
+    "enrichment":          0.70,
+    "clay_ai":             0.55,   # KI-Recherche
+}
+rank = min(konfidenz_der_zeile, SOURCE_RANK[quelle])
+```
+
+Der Quellenrang ist eine **Obergrenze**. Eine Zeile kann durch ihre Konfidenz
+schlechter werden als ihre Quelle, aber nie besser — deshalb kann eine
+KI-Vermutung eine amtliche Domain auch dann nicht ueberschreiben, wenn das
+Modell 0,99 dafuer meldet. Verifiziert: Ein Testimport mit
+`clay_ai / 0.99` gegen `sva.de` wurde abgewiesen und in `domain_note`
+protokolliert; dieselbe Quelle fuellte im selben Lauf eine leere Zelle.
 
 ### Stufe 0 gab es zuerst nicht, und das war der teuerste Fehler
 

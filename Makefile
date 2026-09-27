@@ -1,4 +1,4 @@
-.PHONY: demo run longlist domains vollstaendigkeit export runlog reset retier package vk-audit
+.PHONY: demo run longlist domains clay-todo vollstaendigkeit export runlog reset retier package vk-audit
 
 demo:            ## Offline gegen Fixtures - fuer die Live-Demo
 	python3 -m src.cli run
@@ -6,6 +6,9 @@ demo:            ## Offline gegen Fixtures - fuer die Live-Demo
 
 longlist:        ## Aufgabe 1: Markt-Longlist aus 12 Monaten Vergabedaten
 	python3 -m src.cli longlist --live --months 12
+
+clay-todo:       ## Stufe 2 des Domain-Waterfalls: offene Zeilen fuer Clay
+	python3 -m src.export.clay_domain_todo
 
 vollstaendigkeit: ## Fang-Wiederfang: wie viele Firmen fehlen der Liste?
 	python3 -m src.longlist.completeness
