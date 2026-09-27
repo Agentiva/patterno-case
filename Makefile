@@ -1,4 +1,4 @@
-.PHONY: demo run longlist domains export runlog reset retier package vk-audit
+.PHONY: demo run longlist domains vollstaendigkeit export runlog reset retier package vk-audit
 
 demo:            ## Offline gegen Fixtures - fuer die Live-Demo
 	python3 -m src.cli run
@@ -6,6 +6,9 @@ demo:            ## Offline gegen Fixtures - fuer die Live-Demo
 
 longlist:        ## Aufgabe 1: Markt-Longlist aus 12 Monaten Vergabedaten
 	python3 -m src.cli longlist --live --months 12
+
+vollstaendigkeit: ## Fang-Wiederfang: wie viele Firmen fehlen der Liste?
+	python3 -m src.longlist.completeness
 
 domains:         ## Domains aus der amtlichen Quelle ziehen und einspielen
 	python3 -m src.resolve.domains

@@ -273,6 +273,21 @@ nachweislich an öffentlichen Ausschreibungen teilnehmen. Das Universum entsteht
 nicht aus einem Branchenverzeichnis, sondern aus den Vergabedaten selbst: Jede
 Zeile trägt eine Bekanntmachung mit Datum und PDF.
 
+**Wie viel davon ist der Markt?** Gemessen, nicht geschätzt
+([vollstaendigkeit.md](vollstaendigkeit.md)): Fang-Wiederfang über zwölf
+monatliche Beobachtungsgelegenheiten setzt die Population auf **mindestens
+6.798** Unternehmen — die Liste deckt also **höchstens 36 %** ab. 73 % der
+erfassten Firmen tauchen in genau einem von zwölf Monaten auf, die Signatur
+einer unterabgetasteten Grundmenge.
+
+Daneben liegt ein blinder Fleck, der in dieser Zahl **nicht** enthalten ist:
+Rund 90 % der öffentlichen Aufträge in Deutschland sind unterschwellig, im
+Korpus liegen aber 77 % der bewerteten Verfahren über der EU-Schwelle. Genau
+unterhalb arbeiten die Systemhäuser im ICP-Korridor von 50 bis 2.000
+Mitarbeitenden. Für die Ansprache heißt das: Die Liste ist eine belastbare
+Basis, aber kein vollständiges Universum — wer hier niemanden findet, hat
+daraus keinen Schluss gezogen.
+
 Regionaler Schwerpunkt Tier A: Berlin (23), München (13), Hamburg (12),
 Frankfurt am Main (10), Stuttgart (9), Bonn (9), Düsseldorf (9), Köln (9) —
 verteilt über alle PLZ-Zonen, kein regionaler Klumpen.
