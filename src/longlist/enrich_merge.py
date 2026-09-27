@@ -70,7 +70,36 @@ FIELD_ALIASES = {
     "industry": ("industry", "branche", "apollo_industry"),
     "linkedin": ("linkedin", "linkedin_url", "apollo_linkedin"),
     "domain_source": ("domain_source", "quelle", "source"),
+    "domain_confidence": ("domain_confidence", "confidence", "domain_konfidenz"),
 }
+
+# Rang der Domainquellen. Eine spaetere Anreicherung darf eine BESSERE
+# Quelle nicht ueberschreiben.
+#
+# Der Fall, der das noetig macht: Die amtliche Domain kommt aus
+# contactPoint des Bieters in der Bekanntmachung - das Unternehmen hat sie
+# der Vergabestelle selbst gemeldet. Apollo und Clay loesen dagegen
+# regelmaessig auf die Konzernmutter auf (Computacenter AG & Co OHG in
+# Kerpen -> computacenter.com in Hatfield/UK). Wer erst `domains_amtlich`
+# und danach den Clay-Export einspielt, hat ohne diese Regel die schlechtere
+# Zahl in der Spalte - und merkt es nicht, weil die Spalte gefuellt bleibt.
+SOURCE_RANK = {
+    "amtlich_bestaetigt": 0.95,     # url und Mail der Bekanntmachung stimmen ueberein
+    "amtlich_namensbezug": 0.90,    # eine amtliche Quelle, Domainstamm passt zum Namen
+    "amtlich_unbestaetigt": 0.60,
+    "enrichment": 0.70,             # Clay/Apollo ohne eigene Konfidenzangabe
+}
+DEFAULT_RANK = 0.70
+
+
+def _rank(source: str | None, confidence=None) -> float:
+    """Guete einer Domainangabe. Eine mitgelieferte Konfidenz gewinnt."""
+    try:
+        if confidence not in (None, ""):
+            return float(confidence)
+    except (TypeError, ValueError):
+        pass
+    return SOURCE_RANK.get((source or "").strip(), DEFAULT_RANK)
 
 
 def _norm_key(k: str) -> str:
@@ -194,7 +223,7 @@ def merge(enriched_path: Path | None = None,
         raise SystemExit(f"{longlist_path} ist leer")
 
     fields = list(rows[0].keys())
-    for c in ("employees_scope", "employees_note", "tier_status",
+    for c in ("employees_scope", "employees_note", "domain_note", "tier_status",
               "apollo_industry", "apollo_linkedin"):
         if c not in fields:
             fields.append(c)
@@ -205,6 +234,7 @@ def merge(enriched_path: Path | None = None,
     for row in rows:
         row.setdefault("employees_scope", "")
         row.setdefault("employees_note", "")
+        row.setdefault("domain_note", "")
         row.setdefault("apollo_industry", "")
         row.setdefault("apollo_linkedin", "")
 
@@ -214,9 +244,35 @@ def merge(enriched_path: Path | None = None,
         if rec:
             stats["gematcht"] += 1
             if rec.get("domain"):
-                row["domain"] = rec["domain"]
-                row["domain_source"] = rec.get("domain_source") or "enrichment"
-                stats["domain_uebernommen"] += 1
+                neu = _rank(rec.get("domain_source"), rec.get("domain_confidence"))
+                alt = _rank(row.get("domain_source"), row.get("domain_confidence"))
+                # Gleiche Domain aus beiden Quellen ist eine Bestaetigung,
+                # kein Konflikt. Ohne diese Zeile meldete der Lauf 33
+                # "abgewiesene" Domains, von denen 31 mit der vorhandenen
+                # identisch waren - eine Warnung, die nichts warnt, wird
+                # ueberlesen, und dann auch die zwei echten Faelle.
+                gleich = (rec["domain"] or "").strip().lower() == \
+                         (row.get("domain") or "").strip().lower()
+                if gleich:
+                    stats["domain_bestaetigt"] += 1
+                elif not row.get("domain") or neu >= alt:
+                    row["domain"] = rec["domain"]
+                    row["domain_source"] = rec.get("domain_source") or "enrichment"
+                    if rec.get("domain_confidence") not in (None, ""):
+                        row["domain_confidence"] = rec["domain_confidence"]
+                    stats["domain_uebernommen"] += 1
+                else:
+                    # Nicht stillschweigend verwerfen: Wer den Clay-Export
+                    # einspielt, soll sehen, dass die bessere Quelle gewonnen
+                    # hat - und welche Domain stattdessen angeboten wurde.
+                    stats["domain_bessere_behalten"] += 1
+                    # Eigene Spalte, nicht employees_note: Dieser Hinweis
+                    # handelt von der Domain, und employees_note wird wenige
+                    # Zeilen weiter unten von classify_headcount neu gesetzt -
+                    # der Text waere still verschwunden.
+                    row["domain_note"] = (
+                        f"{rec['domain']} verworfen, {row['domain']} "
+                        f"({row.get('domain_source')}) ist besser belegt")
             row["apollo_industry"] = rec.get("industry") or row["apollo_industry"]
             row["apollo_linkedin"] = rec.get("linkedin") or row["apollo_linkedin"]
 

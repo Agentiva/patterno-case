@@ -5,9 +5,10 @@ Lizenzkosten, jede Zeile mit Beleg-URL.
 
 ```bash
 pip install -r requirements.txt
+make longlist                      # Aufgabe 1: 12 Monate Vergabedaten → Longlist
+make run                           # Aufgabe 2: Signale gegen die echten APIs
 make demo                          # offline, 2× hintereinander = 0 neue Zeilen
-make run                           # gegen die echten APIs
-make retier FROM=clay-export.csv   # Domains/Kontaktdaten einspielen
+make domains                       # Domains aus der Quelle + Tiers nachziehen
 make package                       # Abgabedateien + Stichproben-Audit
 ```
 
@@ -25,8 +26,9 @@ bekommen, hier ist das PDF". Teilnahme ist ein Faktum, kein Attribut.
 
 | | |
 |---|---|
-| **Tier** (nur aus Vergabedaten: Häufigkeit, Aktualität, Breite, Belegart) | A 233 · B 1.261 · C 964 |
-| **Signale** 8 Wochen, 3 Quellen | 651 Accounts, 200 über Schwelle 40 |
+| **Tier** (nur aus Vergabedaten: Häufigkeit, Aktualität, Breite, Belegart) | A 228 · B 1.249 · C 981 |
+| **Domain** aus der amtlichen Quelle, mit Prüfschicht | 1.487 / 2.458 · **60,5 %**, Quelle und Konfidenz je Zeile |
+| **Signale** 8 Wochen, 3 Quellen | 629 Accounts, 172 über Schwelle 40 |
 | **Idempotenz** live | Lauf 1: 1.850 neu · Läufe 2–4: **0 neu, 0 geändert** |
 | **Eigenes Audit** 30 Zufallszeilen | 24/24 prüfbare Belege erreichbar · 5× TED nicht prüfbar · 2 Zeilen ohne Longlist-Bezug |
 | **Kontakte** | 69 Personen an 30 Accounts, E-Mail-Status je Zeile mit Quelle |
@@ -40,59 +42,57 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
   Handwerkskammer-Rahmenvereinbarung jeden Werkzeuglieferanten in die Liste.
 - **Vier Belegarten statt einer.** In 4.309 Bekanntmachungen ohne
   Gewinnerangabe hat **3.987 mal genau ein Bieter** geboten — der hat gewonnen,
-  nur anders gemappt. Pauschal als „hat verloren" geführt: 1.727 erfundene
-  Eigenschaften mit amtlicher URL daneben.
+  nur anders gemappt. Pauschal „hat verloren": 1.727 erfundene Eigenschaften
+  mit amtlicher URL daneben.
 - **Getrennte Fehlerkübel.** Vergabestellen, Job-Signale ohne IT-Beleg und
   unsichere Auflösungen (85) landen je in einer eigenen Datei — nie im Outbound.
+  TED-Belege sind maschinell nicht prüfbar (HTTP 202) und werden als eigene
+  Kategorie geführt, nicht als „ok".
 - **Jeder Lauf meldet, welcher Signaltyp nicht gefeuert hat.**
+- **Domain aus derselben Bekanntmachung wie der Beleg.** eForms führt einen
+  `contactPoint` je Bieterpartei: 75,3 % roh, ohne einen Credit. Nach der
+  Prüfschicht 60,5 % — die Differenz sind Fremdadressen (**29 Firmen tragen die
+  E-Mail der Beschaffungsstelle Hamburg**), Konzerndomains und kaputte Felder.
+  Clay bestätigt unabhängig 32 von 33
+  ([waterfalls.md](docs/waterfalls.md)).
 
 ## Was nicht funktioniert
 
 - **Unterlegene Bieter sind unsichtbar.** In 438 von 441 Fällen ist die
-  Bieterliste die Gewinnerliste. Das Systemhaus, das zwölfmal bietet und nie
-  gewinnt, steht einmal in zwölf Monaten drin.
+  Bieterliste die Gewinnerliste. Wer zwölfmal bietet und nie gewinnt, steht
+  einmal in zwölf Monaten drin.
 - **Drei Signalquellen statt vier.** Vergabekammer-Entscheidungen sind
   vermessen ([Audit](docs/signals.md),
   [Prompt](docs/clay_claygent_vergabekammer.md)), nicht gebaut.
-- **`offene_ausschreibung_im_profil` feuert, liefert keine Accounts.** Die
-  Frist steht nicht im OCDS-JSON, sondern im eForms-XML (BT-131) — jetzt
-  gelesen, **196 offene Verfahren**. Nur nennt eine laufende Ausschreibung den
-  *Auftraggeber*, nicht den Bieter. Der Join gegen Longlist 1 fehlt.
+- **`offene_ausschreibung_im_profil` feuert, liefert keine Accounts.** Frist
+  aus dem eForms-XML (BT-131), **196 offene Verfahren** — aber eine laufende
+  Ausschreibung nennt den *Auftraggeber*, nicht den Bieter. Join fehlt.
 - **Kein Systemhaus-Klassifikator.** CPV belegt Teilnahme, nicht
-  Geschäftsmodell: Von 20 Stichproben stehen 18 in Tier A, **6 davon gehören
-  nicht ins ICP** (Siemens Gebäudeautomation, Sensorhersteller, ein
+  Geschäftsmodell: Von 20 Stichproben stehen 18 in Tier A, **6 gehören nicht
+  ins ICP** (Siemens Gebäudeautomation, Sensorhersteller,
   Personaldienstleister). [Prompt](docs/clay_sculptor_systemhaus.md) steht,
   gelaufen ist er nicht.
+- **971 Firmen ohne Domain (39,5 %).** 631 davon führt die Quelle nicht, der
+  Rest ist bewusst offen gelassen statt geraten.
 - **Keine Vollständigkeitsschätzung.** Dafür fehlt eine zweite, *unabhängige*
   Quelle; Vergabedaten und Branchenrankings überrepräsentieren beide große
   Firmen.
-- **TED-Belege maschinell nicht prüfbar** (HTTP 202). Der Prüfer weist sie als
-  dritte Kategorie aus, nicht als „ok".
 
-## Fünf Fehler, die jeder erfolgreich aussah
+## Die Fehler
 
-1. **Beleg-URL erfunden.** `/ui/de/notice/<ocid>` ist eine SPA: HTTP 200 auf
-   *jede* URL, dieselbe 1.309-Byte-Hülle, 404 erst im Browser. Ein
-   Statuscheck hätte den Fehler *bestätigt*.
-2. **Das wertvollste Signal feuerte nie.** `rahmenvertrag_laeuft_aus` las
-   `awards[].contractPeriod` — 0 Treffer. Das Vertragsende hängt am Los: 15.716.
-3. **TED schnitt stumm ab.** 2.000 von 2.435 Notices, Lauf meldete Erfolg; im
-   Folgelauf galten 131 als „neu". Jetzt Abgleich gegen `totalNoticeCount`.
-4. **Trefferquote ohne Stichprobenangabe ist wertlos.** Domain-Resolution maß
-   77 % — an bekannten Marken. Im Longtail 8 von 12 falsch, darunter
-   `eominnesota.org` für die EOMI AG aus Hamburg.
-5. **Das Delta log dauerhaft.** Korrekturbekanntmachungen desselben
-   Verfahrens teilten sich einen Schlüssel: 25 Zeilen galten in *jedem* Lauf
-   als „geändert". Hier stand dazu „echte Korrekturen im
-   Überlappungsfenster" — die Erklärung, die zur Zahl passte. Widerlegt von
-   vier identischen Läufen hintereinander.
+Sechs Stück, jeder hat seinen eigenen Selbsttest bestanden — ein HTTP-200, ein
+erfolgreicher Lauf, eine plausible Zahl. Der teuerste: Ich habe den
+Domain-Waterfall bei Apollo begonnen, ohne zu prüfen, ob die Vergabedaten die
+Domain selbst führen. Sie führen sie, bei drei Vierteln der Firmen, kostenlos,
+in derselben Bekanntmachung wie den Beleg. Alle sechs mit Ursache und
+Gegenmaßnahme: [fehler.md](docs/fehler.md).
 
 **Kosten:** Quellen 0 €, Anreicherung ≈ **6,3 Apollo-Credits je
 qualifiziertem Lead** ([operating_model.md](docs/operating_model.md)). Der
 Treiber ist nicht das Credit, sondern jede Domain in der Review-Queue.
 
-**Zeitaufwand:** Quellenprüfung 25 · Longlist 55 · Signal-Engine 45 ·
-Fehlersuche an echten Daten 40 · Enrichment und Audit 30 · Doku 25 Minuten.
+**Zeitaufwand:** Quellen 25 · Longlist 55 · Signal-Engine 45 · Fehlersuche an
+echten Daten 40 · Enrichment und Audit 30 · Doku 25 Minuten.
 
 ## Die nächsten zwei Wochen
 
@@ -106,13 +106,14 @@ Fehlersuche an echten Daten 40 · Enrichment und Audit 30 · Doku 25 Minuten.
 
 ---
 
-**Abgabe** — `data/`: `longlist_markt.csv` (1c) · `enrichment_markt.csv`
-(1d, 48/24) · `longlist_signale.csv` (2c) · `enrichment_signale.csv` (2d,
-21/10) · `validation_sample.csv` · `score_trace.csv`. Nicht fürs Outbound:
-`offene_verfahren.csv`, `job_signale_ohne_icp_beleg.csv`.
-**`docs/`**: [signals.md](docs/signals.md) ·
-[operating_model.md](docs/operating_model.md) ·
+**Abgabe** — `data/`: `longlist_markt.csv` (1c) · `enrichment_markt.csv` (1d)
+· `longlist_signale.csv` (2c) · `enrichment_signale.csv` (2d) ·
+`validation_sample.csv` · `score_trace.csv` · `domains_amtlich.csv`. Nicht fürs
+Outbound: `offene_verfahren.csv`, `job_signale_ohne_icp_beleg.csv`.
+**`docs/`** — [signals.md](docs/signals.md) ·
 [waterfalls.md](docs/waterfalls.md) · [tiering.md](docs/tiering.md) ·
+[operating_model.md](docs/operating_model.md) ·
 [apollo_filter.md](docs/apollo_filter.md) ·
 [clay_sculptor_systemhaus.md](docs/clay_sculptor_systemhaus.md) ·
+[fehler.md](docs/fehler.md) ·
 [playbook_it_systemhaeuser.md](docs/playbook_it_systemhaeuser.md).

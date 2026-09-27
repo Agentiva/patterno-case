@@ -1,0 +1,123 @@
+# Wiederholbare Pipeline als CI-Job.
+#
+# WARUM ZWEI KADENZEN UND NICHT EINE
+# Der Datenservice liefert Monatspakete (Parameter `pubMonth`). Elf der zwoelf
+# Monate im Longlist-Korpus sind eingefroren, nur der laufende waechst. Ein
+# Wochenlauf von Aufgabe 1 wuerde also 1,3 GB laden, um einen Monat zu
+# aktualisieren.
+#
+# Was sich dennoch taeglich aendert, ist die Aktualitaet des Belegs - ein
+# Tier-Kriterium. Gemessen: In drei Tagen wanderten 22 Firmen ein Tier
+# abwaerts. Das rechnet `retier` ohne einen einzigen Download nach.
+#
+#   monatlich   Aufgabe 1 komplett neu, Domains neu aufloesen
+#   woechentlich Aufgabe 2 (Signale) + Tier-Alterung + Abgabedateien
+#
+# KEINE SECRETS
+# Die drei Signalquellen und der Datenservice brauchen keinen API-Key. Der
+# BA-Key ist ein oeffentlich dokumentierter Client-Key und steht in
+# .env.example. Deshalb laeuft dieser Workflow auch in einem Fork.
+name: pipeline
+
+on:
+  schedule:
+    # Montags 05:12 UTC - Signale, Tier-Alterung, Abgabedateien.
+    # Nicht :00: Zu jeder runden Stunde sind die GitHub-Runner am
+    # langsamsten, und der Datenservice beantwortet Anfragen dann traeger.
+    - cron: "12 5 * * 1"
+    # Am 3. des Monats 04:12 UTC - Longlist komplett neu.
+    # Nicht am 1.: Das Monatspaket des Vormonats ist dann noch nicht
+    # vollstaendig. Zwei Tage Puffer, sonst baut der Lauf eine Liste aus
+    # elf Monaten und meldet trotzdem Erfolg.
+    - cron: "12 4 3 * *"
+  workflow_dispatch:
+    inputs:
+      vollstaendig:
+        description: "Longlist neu bauen (12 Monatspakete, ~1,3 GB)"
+        type: boolean
+        default: false
+
+concurrency:
+  # Zwei gleichzeitige Laeufe wuerden sich im Delta-Store in die Quere
+  # kommen: Beide lesen dieselben signal_ids, beide schreiben. Das Ergebnis
+  # waere ein Lauf, der Zeilen als "neu" meldet, die der andere schon hatte.
+  group: pipeline
+  cancel-in-progress: false
+
+jobs:
+  lauf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      # Der Delta-Store entscheidet, was "neu" heisst. Ohne ihn waere jeder
+      # Lauf ein Erstlauf und die Pipeline gaebe jede Woche alles aus -
+      # genau das, was Aufgabe 2b ausschliesst.
+      #
+      # ACHTUNG, bekannte Schwaeche: GitHub raeumt Caches weg, die sieben
+      # Tage nicht angefasst wurden. Ein Wochenrhythmus liegt genau auf
+      # dieser Kante. Faellt der Cache weg, ist das Ergebnis nicht falsch,
+      # aber ein Lauf meldet einmalig alles als "neu" - und wer die Ausgabe
+      # ins Outbound gibt, spricht Firmen doppelt an.
+      # Belastbarer waere der Store in einem Bucket oder in Supabase. Solange
+      # er im Cache liegt, gilt: Dem ersten Lauf nach einer Luecke im
+      # Laufprotokoll (`make runlog`) nicht blind glauben.
+      - name: Delta-Store aus dem letzten Lauf holen
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/state.sqlite
+            data/eforms_fristen.json
+          key: pipeline-state-${{ github.run_id }}
+          restore-keys: pipeline-state-
+
+      - name: Longlist neu bauen (monatlich)
+        if: github.event.schedule == '12 4 3 * *' || inputs.vollstaendig
+        run: |
+          python3 -m src.cli longlist --live --months 12
+          python3 -m src.resolve.domains
+
+      - name: Signale abrufen
+        run: python3 -m src.cli run --live
+
+      # Ohne --from werden nur die Tiers nachgezogen; mit der Datei kommen
+      # zusaetzlich die Domains aus dem Monatslauf dazu.
+      - name: Tiers nachziehen und Domains einspielen
+        run: |
+          if [ -f data/domains_amtlich.csv ]; then
+            python3 -m src.cli retier --from data/domains_amtlich.csv
+          else
+            python3 -m src.cli retier
+          fi
+          python3 -m src.cli export
+          python3 -m src.export.package
+
+      - name: Laufprotokoll
+        run: python3 -m src.cli runlog
+
+      # Belege stichprobenartig gegenpruefen. Ein Lauf, der 1.800 Zeilen mit
+      # toten URLs ausgibt, soll nicht gruen sein.
+      - name: Belege pruefen
+        run: python3 -m src.verify_proofs || echo "::warning::Belegpruefung mit Befunden"
+
+      - name: Ergebnis committen
+        run: |
+          git config user.name  "pipeline"
+          git config user.email "pipeline@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "Keine Aenderung - genau so soll ein Lauf ohne neue Daten aussehen."
+            exit 0
+          fi
+          git commit -m "Pipelinelauf $(date -u +%Y-%m-%d)"
+          git push

@@ -1,7 +1,15 @@
-.PHONY: demo run export runlog reset retier package vk-audit
+.PHONY: demo run longlist domains export runlog reset retier package vk-audit
 
 demo:            ## Offline gegen Fixtures - fuer die Live-Demo
 	python3 -m src.cli run
+	python3 -m src.cli export
+
+longlist:        ## Aufgabe 1: Markt-Longlist aus 12 Monaten Vergabedaten
+	python3 -m src.cli longlist --live --months 12
+
+domains:         ## Domains aus der amtlichen Quelle ziehen und einspielen
+	python3 -m src.resolve.domains
+	python3 -m src.cli retier --from data/domains_amtlich.csv
 	python3 -m src.cli export
 
 run:             ## Gegen die echten APIs

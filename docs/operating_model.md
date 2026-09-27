@@ -113,6 +113,40 @@ die Stückkosten wirklich bewegt.
 
 ## Wiederanlauf und Betrieb
 
+### Zwei Kadenzen, nicht eine
+
+Gebaut als GitHub Action (`.github/workflows/pipeline.yml`), ohne ein einziges
+Secret — die drei Signalquellen und der Datenservice brauchen keinen API-Key.
+
+| | Was läuft | Kosten |
+|---|---|---|
+| **montags 05:12 UTC** | Signale, Tier-Alterung, Abgabedateien | ~50 s, ~100 MB |
+| **am 3. des Monats** | Longlist komplett neu, Domains neu auflösen | ~1,3 GB |
+
+**Warum Aufgabe 1 nicht wöchentlich läuft.** Der Datenservice liefert
+Monatspakete (`pubMonth`). Elf der zwölf Monate im Korpus sind eingefroren, nur
+der laufende wächst. Ein Wochenlauf lädt also 1,3 GB, um einen Monat zu
+aktualisieren.
+
+**Warum sie trotzdem nicht nur quartalsweise reicht.** Ein Tier-Kriterium
+wandert täglich: die Aktualität des Belegs. Gemessen zwischen dem 24. und dem
+27.09.2026 — drei Tage — wanderten **22 Firmen ein Tier abwärts** (A 233 →
+228). Das rechnet `retier` ohne einen Download nach, und genau deshalb läuft es
+im Wochenjob mit. Wer nur quartalsweise einstuft, spricht Firmen mit einem
+Beleg an, der inzwischen ein halbes Jahr alt ist.
+
+**Warum der 3. und nicht der 1.** Am Monatsersten ist das Paket des Vormonats
+noch nicht vollständig. Ohne zwei Tage Puffer baut der Lauf eine Liste aus elf
+Monaten und meldet trotzdem Erfolg.
+
+**Die Schwachstelle, die ich nicht gelöst habe.** Der Delta-Store liegt im
+Actions-Cache, und GitHub räumt Caches nach sieben Tagen ohne Zugriff weg — ein
+Wochenrhythmus liegt genau auf dieser Kante. Fällt der Cache weg, ist das
+Ergebnis nicht falsch, aber ein Lauf meldet einmalig alles als „neu". Wer das
+ins Outbound gibt, spricht Firmen doppelt an. Belastbar wäre der Store in einem
+Bucket oder in Supabase; solange er im Cache liegt, gilt: dem ersten Lauf nach
+einer Lücke im Laufprotokoll nicht blind glauben.
+
 - **Zeitplan:** wöchentlich, montags früh. Vergabebekanntmachungen erscheinen
   über die Woche verteilt; montags ist der Vorlauf auf die Frist am größten.
 - **Idempotenz:** Ein zweiter Lauf ohne neue Daten gibt 0 Zeilen aus. Das ist

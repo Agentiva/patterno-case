@@ -333,6 +333,16 @@ def cmd_retier(args: argparse.Namespace) -> int:
         print(f"  davon MA-Zahl verworfen      {s.get('mitarbeiterzahl_verworfen', 0):>6}"
               f"   (Konzernwert oder unklar - siehe employees_note)")
         print(f"  ohne Treffer                 {s.get('ohne_treffer', 0):>6}")
+        if s.get("domain_bestaetigt"):
+            print(f"  Domain bestaetigt            {s['domain_bestaetigt']:>6}"
+                  f"   (zweite Quelle nennt dieselbe Domain)")
+        behalten = s.get("domain_bessere_behalten", 0)
+        if behalten:
+            # Laut melden. Sonst sieht ein Lauf, der die schlechtere Quelle
+            # korrekt abgewiesen hat, genauso aus wie einer, der nichts
+            # gefunden hat.
+            print(f"  Domain abgewiesen            {behalten:>6}"
+                  f"   (vorhandene Quelle ist besser belegt - siehe domain_note)")
         print(f"\n  Domains gesamt: {res['mit_domain']} von {res['zeilen']}")
 
     print(f"\n  Tier vorher:  {res['tier_vorher']}")
@@ -472,7 +482,12 @@ def main() -> int:
 
     ll = sub.add_parser("longlist", help="Aufgabe 1: Markt-Longlist aus Vergabedaten")
     ll.add_argument("--live", action="store_true")
-    ll.add_argument("--months", type=int, default=36)
+    # 12 Monate, nicht 36. Der Default stand auf 36 und passte damit nicht zu
+    # dem Korpus, den README und Doku beschreiben - wer die Liste nachbauen
+    # wollte, haette 36 Monatspakete geladen und eine andere Liste bekommen
+    # als die abgegebene. Ein falscher Default ist eine stille Abweichung.
+    ll.add_argument("--months", type=int, default=12,
+                    help="Korpuslaenge in Monaten (Default 12 = die abgegebene Liste)")
     ll.set_defaults(func=cmd_longlist)
 
     rt = sub.add_parser(
