@@ -30,11 +30,15 @@ hier ist das PDF". Teilnahme ist ein Faktum, kein Attribut.
 |---|---|
 | **Tier** (nur aus Vergabedaten: Häufigkeit, Aktualität, Breite, Belegart) | A 228 · B 1.249 · C 981 |
 | **Domain** aus der amtlichen Quelle, mit Prüfschicht | 1.487 / 2.458 · **60,5 %**, Quelle und Konfidenz je Zeile |
-| **Signale** 8 Wochen, 3 Quellen | 629 Accounts, 172 über Schwelle 40 |
+| **Signale** 8 Wochen, 3 Quellen | 610 Accounts, 143 über Schwelle 40 |
 | **Idempotenz** live | Lauf 1: 1.850 neu · Läufe 2–4: **0 neu, 0 geändert** |
-| **Eigenes Audit** 30 Zufallszeilen | 24/24 prüfbare Belege erreichbar · 5× TED nicht prüfbar · 2 Zeilen ohne Longlist-Bezug |
+| **Eigenes Audit** 30 Zufallszeilen | 25/25 prüfbare Belege erreichbar · 4× TED nicht prüfbar · 2 Zeilen ohne Longlist-Bezug |
 | **Kontakte** | 69 Personen an 30 Accounts, E-Mail-Status je Zeile mit Quelle |
 | **Abdeckung** Fang-Wiederfang, 12 Monatsgelegenheiten | Population ≥ 6.798 → **≤ 36 %** abgedeckt ([Methode](docs/vollstaendigkeit.md)) |
+
+Gemessen am **27.09.2026**. Die Signalzahlen wandern mit dem Kalender — das
+8-Wochen-Fenster schiebt sich täglich weiter, die Tier-Aktualität altert mit
+(in drei Tagen 22 Firmen ein Tier abwärts). Entwurf, kein Defekt.
 
 ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
 `src/config.py`.

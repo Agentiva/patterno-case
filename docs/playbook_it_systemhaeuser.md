@@ -817,7 +817,7 @@ Vollständige Titellisten, Firmenfilter und die Clay-Reihenfolge in
 
 ## 12. Hinweise zur Nutzung
 
-- **Welle 1 sind 77 Accounts** — Tier A **und** Score ≥ 40. Nicht mit 2.458
+- **Welle 1 sind 58 Accounts** — Tier A **und** Score ≥ 40. Nicht mit 2.458
   starten; die Listenbreite ist Reserve, keine Kampagne.
 - **Erst scoren, dann anreichern.** Signale kosten nichts, Kontaktdaten schon.
   Personensuche nur für Accounts über der Score-Schwelle — rund **6,3

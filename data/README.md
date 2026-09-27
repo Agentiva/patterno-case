@@ -9,7 +9,7 @@ oder ein Fehlerkübel — und keine davon gehört ins Outbound.
 |---|---|---|---|
 | `longlist_markt.csv` | **1c** | 2.458 | Firmenname, Domain, Tier, Beleg-URL |
 | `enrichment_markt.csv` | **1d** | 48 Kontakte / 24 Accounts | Person, Rolle, LinkedIn, E-Mail + Status, Telefon |
-| `longlist_signale.csv` | **2c** | 629 | Signaltyp, Datum, Quell-URL, Score, `why_now` |
+| `longlist_signale.csv` | **2c** | 610 | Signaltyp, Datum, Quell-URL, Score, `why_now` |
 | `enrichment_signale.csv` | **2d** | 21 Kontakte / 10 Accounts | wie 1d, plus „Why now" je Account |
 
 ## Der Beleg dahinter
@@ -40,7 +40,7 @@ Datei geschrieben. Gelöschte Zeilen kann niemand prüfen.
 
 | Datei | Zeilen | Warum separat |
 |---|---|---|
-| `offene_verfahren.csv` | 203 | Laufende Ausschreibungen mit Frist. Nennen den **Auftraggeber**, nicht den Bieter → Join-Input |
+| `offene_verfahren.csv` | 151 | Laufende Ausschreibungen mit Frist. Nennen den **Auftraggeber**, nicht den Bieter → Join-Input |
 | `job_signale_ohne_icp_beleg.csv` | 34 | Bid-Rolle ausgeschrieben, aber kein IT-Vergabebeleg → ICP vor Ansprache prüfen |
 | `clay_domain_todo.csv` | 971 | Die Zeilen ohne Domain, fertig für den Clay-Import (Waterfall Stufe 2) |
 
