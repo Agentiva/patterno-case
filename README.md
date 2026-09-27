@@ -32,7 +32,7 @@ hier ist das PDF".
 | **Domain** aus der amtlichen Quelle, mit Prüfschicht | 1.487 / 2.458 · **60,5 %**, Quelle und Konfidenz je Zeile |
 | **Signale** 8 Wochen, 3 Quellen | 610 Accounts, 143 über Schwelle 40 |
 | **Idempotenz** live | Lauf 1: 1.850 neu · Läufe 2–4: **0 neu, 0 geändert** |
-| **Eigenes Audit** 30 Zufallszeilen | 25/25 prüfbare Belege erreichbar · 4× TED nicht prüfbar · 2 Zeilen ohne Longlist-Bezug |
+| **Eigenes Audit** 30 Zufallszeilen | 26/28 prüfbare Belege sauber · 2× TED nicht prüfbar (JS-Challenge) · 19 Zeilen ganz ohne Befund |
 | **Kontakte** | **40 Leads** (1d) an 23 Accounts · **20 Leads** (2d) an 13 Accounts · E-Mail-Status und Quelle je Zeile |
 | **Abdeckung** Fang-Wiederfang, 12 Monatsgelegenheiten | Population ≥ 6.798 → **≤ 36 %** abgedeckt ([Methode](docs/vollstaendigkeit.md)) |
 
