@@ -1,26 +1,18 @@
 # Fixtures
 
-Die JSON-Dateien hier sind **synthetisch** und mit `make_fixtures.py` erzeugt.
-Firmennamen sind frei erfunden.
+Gespeicherte API-Antworten, damit `make demo` **ohne Netzzugang und ohne
+API-Keys** laeuft. Das ist fuer eine Live-Demo wichtig, in der man sich nicht
+auf fremde APIs verlassen will.
 
-Zweck: `make demo` laeuft ohne Netzzugang und ohne API-Keys. Das ist fuer eine
-Live-Demo wichtig, in der man sich nicht auf fremde APIs verlassen will.
+Die Daten sind **echt**, nicht synthetisch. Bis zum 23.09.2026 lagen hier
+generierte Testdaten, weil die Zielsysteme aus der Bauumgebung nicht
+erreichbar waren; seit dem ersten Live-Lauf sind es echte Antworten. Das
+Generierungsskript ist entfernt - in einem Repo, dessen Prinzip "jede Zeile
+mit Beleg" ist, haben erfundene Firmennamen nichts verloren.
 
-Die Struktur entspricht dem **verifizierten** Schema der echten Quellen:
+Schema der Quellen:
 - `ba_jobs.json` -> `JobSearchResponse` aus https://github.com/bundesAPI/jobsuche-api (openapi.yaml v2.1.0)
 - `vergabe_dovs.json` -> OCDS-Releases, `releases[].awards[].suppliers[]`
-
-Die Testdaten decken bewusst die Kanten ab, an denen eine Pipeline bricht:
-Bietergemeinschaft, oeffentlicher Inhouse-Dienstleister, Wettbewerber,
-einkaufsseitige Stellenanzeige, Rahmenvertrag kurz vor Ablauf, Umlaute.
-
-`make run` (live) ueberschreibt die Dateien mit echten API-Antworten.
-
----
-## Stand 23.09.2026: echte Daten
-
-`make run` lief erstmals gegen die Live-APIs. Die Fixtures wurden dabei mit
-echten Antworten ueberschrieben und sind nicht mehr synthetisch.
 
 ### Was eingecheckt ist und was nicht
 
@@ -59,9 +51,16 @@ Live-Lauf.
 
 ### Getestet wie ein frischer Clone
 
-Mit beiseitegeschobenen Vollfixtures, also nur gegen die Samples:
+`git clone` in ein leeres Verzeichnis, danach nur gegen die eingecheckten
+Samples - also genau das, was ein Pruefer erlebt (27.09.2026):
 
 ```
-Lauf 1   neu 417   geaendert 4   unveraendert   1
-Lauf 2   neu   0   geaendert 6   unveraendert 233
+Lauf 1   neu 458   geaendert 0   unveraendert   0
+Lauf 2   neu   0   geaendert 0   unveraendert 245
 ```
+
+Eine aeltere Fassung dieser Datei nannte hier `geaendert 4` und `geaendert 6`.
+Das waren keine echten Korrekturen, sondern Korrekturbekanntmachungen
+desselben Verfahrens, die sich einen Schluessel teilten und sich in JEDEM
+Lauf neu ueberschrieben. Der Fehler ist behoben (siehe docs/fehler.md, Nr. 5);
+die Zahlen oben sind nachgemessen.
