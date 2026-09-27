@@ -8,9 +8,9 @@ oder ein Fehlerkübel — und keine davon gehört ins Outbound.
 | Datei | Case | Zeilen | Inhalt |
 |---|---|---|---|
 | `longlist_markt.csv` | **1c** | 2.458 | Firmenname, Domain, Tier, Beleg-URL |
-| `enrichment_markt.csv` | **1d** | 48 Kontakte / 24 Accounts | Person, Rolle, LinkedIn, E-Mail + Status, Telefon |
+| `enrichment_markt.csv` | **1d** | **40 Leads** / 23 Accounts | Person, Rolle, LinkedIn, E-Mail + Status, Telefon + Typ + Quelle |
 | `longlist_signale.csv` | **2c** | 610 | Signaltyp, Datum, Quell-URL, Score, `why_now` |
-| `enrichment_signale.csv` | **2d** | 21 Kontakte / 10 Accounts | wie 1d, plus „Why now" je Account |
+| `enrichment_signale.csv` | **2d** | **20 Leads** / 13 Accounts | wie 1d, plus der Why-now-Satz je Zeile |
 
 ## Der Beleg dahinter
 
@@ -28,7 +28,8 @@ Diese Dateien behauptet niemand — sie sind nachrechenbar.
 
 | Datei | Wer liest sie |
 |---|---|
-| `clay_markt_export.csv`, `clay_signale_export.csv` | `make package` — die Kontakte aus Clay |
+| `clay_markt_export.csv` + `clay_markt_export_2.csv` | `make package` — zwei Clay-Läufe für 1d, werden **vereinigt** statt ersetzt |
+| `clay_signale_export.csv` + `clay_signale_export_2.csv` | dasselbe für 2d |
 | `enrichment_kontakte_tierA.csv` | `make package` — liefert die `verifiziert_apollo`-Status |
 | `eforms_fristen.json` | `src/sources/eforms.py` — Cache der Angebotsfristen (BT-131), 1.681 Einträge. Ohne ihn holt jeder Lauf hunderte XML-Dokumente neu. |
 | `apollo_cache/` | `src/enrich/apollo.py` — die Antworten des Apollo-Laufs vom 23.09. Macht ihn wiederholbar, ohne erneut Credits auszugeben. |

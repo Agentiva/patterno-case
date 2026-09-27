@@ -19,7 +19,7 @@ make package                       # Abgabedateien + Stichproben-Audit
 Nicht ein Firmenverzeichnis auf Public-Sector-Bezug filtern, sondern
 **Vergabedaten auf Systemhaus-Eignung**. Verzeichnis-first liefert „könnte
 relevant sein", Vergabedaten-first „hat am 15.09.2026 den Zuschlag bekommen,
-hier ist das PDF". Teilnahme ist ein Faktum, kein Attribut.
+hier ist das PDF".
 
 ## Ergebnis
 
@@ -33,7 +33,7 @@ hier ist das PDF". Teilnahme ist ein Faktum, kein Attribut.
 | **Signale** 8 Wochen, 3 Quellen | 610 Accounts, 143 über Schwelle 40 |
 | **Idempotenz** live | Lauf 1: 1.850 neu · Läufe 2–4: **0 neu, 0 geändert** |
 | **Eigenes Audit** 30 Zufallszeilen | 25/25 prüfbare Belege erreichbar · 4× TED nicht prüfbar · 2 Zeilen ohne Longlist-Bezug |
-| **Kontakte** | 69 Personen an 30 Accounts, E-Mail-Status je Zeile mit Quelle |
+| **Kontakte** | **40 Leads** (1d) an 23 Accounts · **20 Leads** (2d) an 13 Accounts · E-Mail-Status und Quelle je Zeile |
 | **Abdeckung** Fang-Wiederfang, 12 Monatsgelegenheiten | Population ≥ 6.798 → **≤ 36 %** abgedeckt ([Methode](docs/vollstaendigkeit.md)) |
 
 Gemessen am **27.09.2026**. Die Signalzahlen wandern mit dem Kalender — das
@@ -68,17 +68,18 @@ ICP-Annahmen, Ausschlusslisten und Gewichte stehen an **einer** Stelle:
   einmal drin.
 - **Drei Signalquellen statt vier.** Vergabekammer-Entscheidungen sind
   vermessen ([Prompt](docs/clay_claygent_vergabekammer.md)), nicht gebaut.
-- **`offene_ausschreibung_im_profil` feuert, liefert keine Accounts.** Frist
-  aus dem eForms-XML (BT-131), **196 offene Verfahren** — aber eine laufende
-  Ausschreibung nennt den *Auftraggeber*, nicht den Bieter. Join fehlt.
+- **`offene_ausschreibung_im_profil` liefert keine Accounts.** Frist aus dem
+  eForms-XML (BT-131) — aber eine laufende Ausschreibung nennt den
+  *Auftraggeber*, nicht den Bieter. Join fehlt.
 - **Kein Systemhaus-Klassifikator.** CPV belegt Teilnahme, nicht
   Geschäftsmodell: Von 20 Stichproben stehen 18 in Tier A, **6 gehören nicht
-  ins ICP** (Siemens Gebäudeautomation, Sensorhersteller,
-  Personaldienstleister). [Prompt](docs/clay_sculptor_systemhaus.md) steht,
-  gelaufen ist er nicht.
-- **971 Firmen ohne Domain (39,5 %).** Stufe 2 des Waterfalls (KI-Recherche
-  in Clay) ist gebaut, aber nicht gelaufen — `make clay-todo` erzeugt die
-  971 Zeilen ([Prompt](docs/clay_domain_waterfall.md)).
+  ins ICP** (Siemens Gebäudeautomation, Sensorik, Personaldienstleister).
+  [Prompt](docs/clay_sculptor_systemhaus.md) steht, gelaufen ist er nicht.
+- **Enrichment-Abdeckung.** 971 Firmen ohne Domain (39,5 %) — Stufe 2 des
+  Waterfalls ist gebaut, nicht gelaufen (`make clay-todo`,
+  [Prompt](docs/clay_domain_waterfall.md)). Und die 40 bzw. 20 Leads verteilen
+  sich auf 23 bzw. 13 Firmen: Der zweite Clay-Lauf fand 15 von 16 Firmen, die
+  schon im ersten standen.
 - **Höchstens ein Drittel abgedeckt.** 73 % der Firmen tauchen in genau
   *einem* von zwölf Monaten auf — unterabgetastet. Daneben der größere blinde
   Fleck: ~90 % der öffentlichen Aufträge sind unterschwellig, im Korpus liegen
@@ -95,8 +96,8 @@ Gegenmaßnahmen: [fehler.md](docs/fehler.md).
 **Kosten:** Quellen 0 €, Anreicherung ≈ **6,3 Apollo-Credits je
 qualifiziertem Lead** ([operating_model.md](docs/operating_model.md)).
 
-**Zeitaufwand:** Quellen 25 · Longlist 55 · Signal-Engine 45 · Fehlersuche an
-echten Daten 40 · Enrichment und Audit 30 · Doku 25 Minuten.
+**Zeitaufwand:** Quellen 25 · Longlist 55 · Signal-Engine 45 · Fehlersuche 40
+· Enrichment und Audit 30 · Doku 25 Minuten.
 
 ## Die nächsten zwei Wochen
 

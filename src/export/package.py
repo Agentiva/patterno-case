@@ -46,8 +46,25 @@ from src.resolve.normalize import normalize_company
 DATA = Path("data")
 ADDR = re.compile(r"[^@\s]+@[^@\s]+\.[a-z]{2,}$", re.IGNORECASE)
 
-TOP_MARKT = 40
-TOP_SIGNALE = 20
+# === ZWEI DECKEL, WEIL ZWEI FRAGEN DAHINTERSTEHEN ===
+#
+# Der Case fragt nach "top 40 Prio Accounts" (1d) und "20 Accounts mit dem
+# hoechsten Score" (2d). Im Regelbetrieb heisst Account = Unternehmen, und
+# dafuer steht ACCOUNT_CAP.
+#
+# Fuer die ABGABE wird zusaetzlich die Zeilenzahl gedeckelt: 40 bzw. 20
+# Leads. Grund ist die Datenlage, nicht die Auslegung - die beiden
+# Clay-Exporte liefern zusammen 25 verschiedene Firmen fuer 1d und 13 fuer
+# 2d. Wer nur nach Firmen deckelt, gibt 53 Zeilen ab, wo 40 gefragt sind;
+# wer nur nach Zeilen deckelt, verliert die Regel fuer den Regelbetrieb.
+# Also beides, und es bindet, was zuerst greift.
+LEAD_CAP_MARKT = 40          # Zeilen in der Abgabe
+LEAD_CAP_SIGNALE = 20
+ACCOUNT_CAP_MARKT = 40       # verschiedene Unternehmen - die Regel im Betrieb
+ACCOUNT_CAP_SIGNALE = 20
+
+# "Reichere die Liste mit BIS ZU DREI relevanten Ansprechpersonen an" (1.1).
+MAX_KONTAKTE_JE_ACCOUNT = 3
 
 # Formulierungen, mit denen ein Textgenerator zugibt, nichts gefunden zu
 # haben. Im Outbound ist das schlimmer als gar keine Personalisierung.
@@ -154,18 +171,88 @@ def build_markt(clay: list[dict], longlist: dict, apollo: dict,
             "copy_warnung": _copy_warning(row),
         })
 
-    # Nach Tier und Verfahrenszahl sortieren, dann auf TOP_MARKT Accounts
-    # kuerzen - nicht auf 40 KONTAKTE. Der Case fragt nach Accounts.
     order = {"A": 0, "B": 1, "C": 2, "D": 3, "": 9}
-    out.sort(key=lambda r: (order.get(r["tier"], 9),
-                            -int(r["verfahren_12m"] or 0), r["firma"]))
-    keep, seen = [], []
-    for r in out:
-        if r["company_id"] not in seen:
-            if len(seen) >= TOP_MARKT:
-                continue
-            seen.append(r["company_id"])
-        keep.append(r)
+    return _auswahl(
+        out,
+        konto_rang=lambda r: (order.get(r["tier"], 9),
+                              -int(r["verfahren_12m"] or 0), r["firma"]),
+        lead_cap=LEAD_CAP_MARKT, account_cap=ACCOUNT_CAP_MARKT)
+
+
+# === DIE AUSWAHL ===
+def _persona_rang(persona: str) -> int:
+    """Champion zuerst. Er bearbeitet die Verfahren selbst und ist der
+    einzige, der den Schmerz aus eigener Anschauung kennt."""
+    return {"Champion - Bid/Tender": 0,
+            "Economic Buyer": 1}.get(persona, 2)
+
+
+def _auswahl(rows: list[dict], konto_rang, lead_cap: int,
+             account_cap: int) -> list[dict]:
+    """Je Account bis zu drei Kontakte, dann reihum auffuellen.
+
+    === WARUM REIHUM UND NICHT ACCOUNT FUER ACCOUNT ===
+    Nimmt man die Accounts der Reihe nach voll, landen 40 Leads bei rund
+    14 Firmen. Reihum - erst je ein Kontakt pro Account, dann der zweite,
+    dann der dritte - landen dieselben 40 Leads bei 25 Firmen.
+
+    Fuer Outbound ist das der Unterschied zwischen 14 und 25 Versuchen.
+    Und der erste Kontakt je Account ist der beste, weil innerhalb des
+    Accounts nach Persona sortiert wird: Champion vor Buyer vor Nutzer.
+    """
+    # Zeilen ohne Adresse fliegen raus, nicht nur nach hinten.
+    #
+    # Ein Lead, den man nicht anschreiben kann, ist keiner. Solange genug
+    # Kandidaten mit Adresse da sind, gehoert er nicht in eine Liste, die
+    # "top 40 Leads" heisst. Wieviele das betrifft, wird gemeldet - still
+    # verschwinden soll nichts.
+    def _unbrauchbar(r: dict) -> str:
+        if r["email_status"] == "keine_adresse":
+            return "ohne E-Mail-Adresse"
+        # Der Clay-Export ist ein Standbild: Er wurde gezogen, bevor die
+        # Personaldienstleister auf die Ausschlussliste kamen. SThree
+        # gewinnt IT-Ausschreibungen und vermittelt trotzdem nur Menschen.
+        # Zwei von 40 Plaetzen dafuer auszugeben waere die teuerste Art,
+        # eine Ausschlussliste zu ignorieren, die man selbst gepflegt hat.
+        for feld in ("in_longlist", "in_longlist_signale"):
+            if (r.get(feld) or "").startswith("NEIN"):
+                return "nicht in der Longlist"
+        return ""
+
+    raus = [r for r in rows if _unbrauchbar(r)]
+    mit = [r for r in rows if not _unbrauchbar(r)]
+    if raus:
+        from collections import Counter
+        gruende = Counter(_unbrauchbar(r) for r in raus)
+        print(f"  . {len(raus)} Kontakt(e) uebersprungen "
+              f"({dict(gruende)}); {len(mit)} brauchbar fuer {lead_cap} Plaetze")
+        if len(mit) >= lead_cap:
+            rows = mit
+
+    nach_account: dict[str, list[dict]] = {}
+    for r in rows:
+        nach_account.setdefault(r["company_id"], []).append(r)
+
+    for cid, liste in nach_account.items():
+        # Innerhalb eines Accounts: geprueft vor ungeprueft, dann Persona.
+        # Ein Apollo-verifizierter Kontakt ist die belastbarste Zeile, die
+        # es gibt - er darf nicht am Rundenprinzip scheitern.
+        liste.sort(key=lambda r: (r["email_status"] == "keine_adresse",
+                                  0 if r["email_status"] == "verifiziert_apollo" else 1,
+                                  _persona_rang(r["persona"]),
+                                  r["name"]))
+        del liste[MAX_KONTAKTE_JE_ACCOUNT:]
+
+    accounts = sorted(nach_account, key=lambda cid: konto_rang(nach_account[cid][0]))
+    accounts = accounts[:account_cap]
+
+    keep: list[dict] = []
+    for runde in range(MAX_KONTAKTE_JE_ACCOUNT):
+        for cid in accounts:
+            if len(keep) >= lead_cap:
+                return keep
+            if runde < len(nach_account[cid]):
+                keep.append(nach_account[cid][runde])
     return keep
 
 
@@ -221,15 +308,10 @@ def build_signale(clay: list[dict], signale: dict, apollo: dict,
             "telefon_quelle": "clay_export" if (row.get("Mobile Phone") or "").strip() else "",
             "copy_warnung": _copy_warning(row),
         })
-    out.sort(key=lambda r: -int(r["score"] or 0))
-    keep, seen = [], []
-    for r in out:
-        if r["company_id"] not in seen:
-            if len(seen) >= TOP_SIGNALE:
-                continue
-            seen.append(r["company_id"])
-        keep.append(r)
-    return keep
+    return _auswahl(
+        out,
+        konto_rang=lambda r: (-int(r["score"] or 0), r["firma"]),
+        lead_cap=LEAD_CAP_SIGNALE, account_cap=ACCOUNT_CAP_SIGNALE)
 
 
 # --- Stichproben-Audit --------------------------------------------------------
@@ -286,9 +368,77 @@ def build_validation(markt: list[dict], signale: list[dict],
     return rows
 
 
+# Clay-Exporte je Aufgabe. MEHRERE Dateien, bewusst nicht eine.
+#
+# Ein Clay-Export ist ein Standbild einer View zu einem Zeitpunkt. Zwei
+# Laeufe gegen dieselbe Longlist liefern ueberlappende, aber nicht
+# identische Mengen - der zweite fand 16 Firmen, von denen 15 schon im
+# ersten standen, dafuer aber Telefonnummern bei 20 von 20 Zeilen, wo der
+# erste 12 von 21 hatte.
+#
+# Die Exporte zu ERSETZEN wuerde also Abdeckung wegwerfen. Sie werden
+# deshalb vereinigt, und die Herkunft bleibt je Zeile erhalten.
+CLAY_MARKT = [
+    Path("data/clay_markt_export.csv"),      # Lauf 1, 48 Kontakte / 24 Firmen
+    Path("data/clay_markt_export_2.csv"),    # Lauf 2, 40 Kontakte / 16 Firmen
+]
+CLAY_SIGNALE = [
+    Path("data/clay_signale_export.csv"),    # Lauf 1, 21 Kontakte / 10 Firmen
+    Path("data/clay_signale_export_2.csv"),  # Lauf 2, 20 Kontakte / 11 Firmen
+]
+
+
+def _person_key(row: dict) -> str:
+    """Identitaet einer Person ueber Exporte hinweg.
+
+    LinkedIn zuerst: Die URL ist die einzige Angabe, die sich zwischen zwei
+    Clay-Laeufen nicht aendert. E-Mail als Rueckfall, Name plus Firma als
+    letzte Reserve - beides ist schwaecher, weil Clay Adressen nachtraegt
+    und Namen unterschiedlich schreibt.
+    """
+    for feld in ("LinkedIn Profile", "Work Email"):
+        v = (row.get(feld) or "").strip().lower()
+        if v:
+            return v
+    return f"{(row.get('Full Name') or '').strip().lower()}|" \
+           f"{(row.get('Company Name') or '').strip().lower()}"
+
+
+def _read_clay(pfade: list[Path]) -> list[dict]:
+    """Mehrere Exporte vereinigen, je Person die vollstaendigere Zeile.
+
+    "Vollstaendiger" heisst: mehr gefuellte Felder. Der zweite Lauf traegt
+    bei vielen Zeilen eine Telefonnummer nach, die im ersten fehlte - wer
+    stumpf den ersten Treffer behaelt, wirft sie weg.
+    """
+    beste: dict[str, dict] = {}
+    gelesen = 0
+    for pfad in pfade:
+        if not pfad.exists():
+            print(f"  . {pfad} fehlt - uebersprungen")
+            continue
+        for row in _read(pfad):
+            gelesen += 1
+            row["_quelle"] = pfad.name
+            k = _person_key(row)
+            alt = beste.get(k)
+            if alt is None or _gefuellt(row) > _gefuellt(alt):
+                beste[k] = row
+    if gelesen != len(beste):
+        print(f"  . {len(pfade)} Exporte: {gelesen} Zeilen gelesen, "
+              f"{gelesen - len(beste)} Dublette(n) zusammengefuehrt "
+              f"-> {len(beste)} Personen")
+    return list(beste.values())
+
+
+def _gefuellt(row: dict) -> int:
+    return sum(1 for k, v in row.items()
+               if k != "_quelle" and (v or "").strip())
+
+
 def main() -> int:
-    clay_m = _read(Path("data/clay_markt_export.csv"))
-    clay_s = _read(Path("data/clay_signale_export.csv"))
+    clay_m = _read_clay(CLAY_MARKT)
+    clay_s = _read_clay(CLAY_SIGNALE)
     longlist = _index(_read(DATA / "longlist_markt.csv"))
     signale = _index(_read(DATA / "longlist_signale.csv"))
 
